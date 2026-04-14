@@ -13,12 +13,34 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
 model User {
-  id String @id @default(uuid())
-  email String @unique
-  password String
+  id        String         @id @default(uuid())
+  email     String         @unique
+  password  String?
   firstName String
-  lastName String
+  lastName  String
+  accounts  OAuthAccount[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt @default(now())
 
   @@map("users")
+}
+
+model OAuthAccount {
+  id                String       @id @default(uuid())
+  provider          AuthProvider
+  providerAccountId String
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
 }

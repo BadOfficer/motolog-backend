@@ -14,6 +14,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthUser } from './interfaces/auth-user.interface';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import type { GoogleUser } from './interfaces/google-user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -41,5 +43,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: AuthUser) {
     return user;
+  }
+
+  @Get('google')
+  @UseGuards(GoogleAuthGuard)
+  googleAuth() {
+    return;
+  }
+
+  @Get('google/callback')
+  @UseGuards(GoogleAuthGuard)
+  googleAuthCallback(@CurrentUser() googleUser: GoogleUser) {
+    return this.authService.signInWithGoogle(googleUser);
   }
 }

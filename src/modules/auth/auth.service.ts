@@ -10,6 +10,9 @@ import { JwtPayload } from './interfaces/jwt.interface';
 import { ConfigService } from '@nestjs/config';
 import { SignUpDto } from './dto/sign-up.dto';
 import type { AuthUser } from './interfaces/auth-user.interface';
+import type { GoogleUser } from './interfaces/google-user.interface';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { AuthProvider } from 'src/generated/prisma/enums';
 
 import * as bcrypt from 'bcrypt';
 
@@ -23,6 +26,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
+    private readonly prismaService: PrismaService,
   ) {
     this.JWT_SECRET = configService.getOrThrow<string>('JWT_SECRET');
     this.JWT_ACCESS_TTL = configService.getOrThrow<string>('JWT_ACCESS_TTL');
@@ -65,7 +69,7 @@ export class AuthService {
   async signIn(signInDto: SignInDto) {
     const user = await this.usersService.findUserByEmail(signInDto.email);
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -96,5 +100,58 @@ export class AuthService {
     }
 
     return this.generateTokens(user.id);
+  }
+
+  async signInWithGoogle(googleUser: GoogleUser) {
+    const existedOAuthAccount =
+      await this.prismaService.oAuthAccount.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: AuthProvider.GOOGLE,
+            providerAccountId: googleUser.providerAccountId,
+          },
+        },
+        select: {
+          userId: true,
+        },
+      });
+
+    if (existedOAuthAccount) {
+      return this.generateTokens(existedOAuthAccount.userId);
+    }
+
+    if (!googleUser.email) {
+      throw new UnauthorizedException('Google email is required');
+    }
+
+    const existedUser = await this.usersService.findUserByEmail(
+      googleUser.email,
+    );
+
+    const createdUser = !existedUser
+      ? await this.prismaService.user.create({
+          data: {
+            email: googleUser.email,
+            password: null,
+            firstName: googleUser.firstName || 'Google',
+            lastName: googleUser.lastName || 'User',
+          },
+          select: {
+            id: true,
+          },
+        })
+      : null;
+
+    const userId = existedUser?.id ?? createdUser!.id;
+
+    await this.prismaService.oAuthAccount.create({
+      data: {
+        provider: AuthProvider.GOOGLE,
+        providerAccountId: googleUser.providerAccountId,
+        userId,
+      },
+    });
+
+    return this.generateTokens(userId);
   }
 }
