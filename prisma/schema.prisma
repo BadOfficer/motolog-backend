@@ -57,8 +57,35 @@ model Vehicle {
   licensePlate    String?
   user            User @relation(fields: [userId], references: [id])
   userId          String
+  serviceLogs     ServiceLog[]
+  lastMileageUpdate DateTime @default(now())
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
   @@map("vehicles")
+}
+
+model ServiceCategory {
+  id            String @id @default(uuid())
+  title         String @unique
+  serviceLogs   ServiceLog[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+
+  @@map("log_categories")
+}
+
+model ServiceLog {
+  id          String @id @default(uuid())
+  category    ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId   String
+  description String
+  mileage     Int
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@map("logs")
 }

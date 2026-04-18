@@ -1,5 +1,9 @@
 import { HttpService } from '@nestjs/axios';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { parseVinResults } from './helpers/parse-vin-results';
 import {
   DecodeVinItem,
@@ -14,6 +18,20 @@ export class VehiclesService {
     private readonly httpService: HttpService,
     private readonly prismaService: PrismaService,
   ) {}
+
+  async findById(carId: string) {
+    const existCar = await this.prismaService.vehicle.findUnique({
+      where: {
+        id: carId,
+      },
+    });
+
+    if (!existCar) {
+      throw new NotFoundException(`Car with id - ${carId} not found`);
+    }
+
+    return existCar;
+  }
 
   async decodeVin(vin: string): Promise<DecodeVinResponse> {
     const initialResult: DecodeVinItem = {
@@ -60,14 +78,42 @@ export class VehiclesService {
       );
     }
 
+    const truthyCarData = await this.decodeVin(createVehicleDto.vin);
+
+    if (truthyCarData.make && truthyCarData.make !== createVehicleDto.make) {
+      throw new BadRequestException(
+        `Invalid make for vin - ${createVehicleDto.vin}`,
+      );
+    }
+
     return this.prismaService.vehicle.create({
       data: {
         ...createVehicleDto,
         userId,
       },
       select: {
-        id: true
-      }
+        id: true,
+      },
+    });
+  }
+
+  async updateMileage(carId: string, newMileage: number) {
+    const existCar = await this.findById(carId);
+
+    const currentMileage = existCar.currentMileage;
+
+    if (newMileage < currentMileage) {
+      throw new BadRequestException('Incorrect mileage data');
+    }
+
+    return this.prismaService.vehicle.update({
+      where: {
+        id: carId,
+      },
+      data: {
+        currentMileage: newMileage,
+        lastMileageUpdate: new Date(),
+      },
     });
   }
 }
