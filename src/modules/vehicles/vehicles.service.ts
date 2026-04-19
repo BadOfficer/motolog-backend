@@ -98,14 +98,6 @@ export class VehiclesService {
   }
 
   async updateMileage(carId: string, newMileage: number) {
-    const existCar = await this.findById(carId);
-
-    const currentMileage = existCar.currentMileage;
-
-    if (newMileage < currentMileage) {
-      throw new BadRequestException('Incorrect mileage data');
-    }
-
     return this.prismaService.vehicle.update({
       where: {
         id: carId,

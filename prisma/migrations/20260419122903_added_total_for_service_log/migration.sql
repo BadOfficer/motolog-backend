@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "logs" ADD COLUMN     "total" DECIMAL(65,30) NOT NULL DEFAULT 0;
