@@ -57,8 +57,6 @@ model Vehicle {
   licensePlate    String?
   user            User @relation(fields: [userId], references: [id])
   userId          String
-  serviceLogs     ServiceLog[]
-  lastMileageUpdate DateTime @default(now())
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
