@@ -26,6 +26,7 @@ model User {
   lastName  String
   accounts  OAuthAccount[]
   vehicles  Vehicle[]
+
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt @default(now())
 
@@ -38,6 +39,7 @@ model OAuthAccount {
   providerAccountId String
   userId            String
   user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -54,37 +56,51 @@ model Vehicle {
   year            Int
   fuelType        String
   currentMileage  Int
-  licensePlate    String?
+  licensePlate    String? @unique
   user            User @relation(fields: [userId], references: [id])
   userId          String
+  serviceLogs            ServiceLog[]
+  lastMileageUpdate DateTime   @default(now())
+
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
   @@map("vehicles")
 }
 
-model ServiceCategory {
+model Category {
   id            String @id @default(uuid())
   title         String @unique
   serviceLogs   ServiceLog[]
+  isSystem      Boolean @default(false)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
 
-  @@map("log_categories")
+  @@map("service_log_categories")
+}
+
+enum ServiceLogStatus {
+  ACTIVE
+  CORRECTED
 }
 
 model ServiceLog {
-  id          String @id @default(uuid())
-  category    ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId  String?
-  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  vehicleId   String
-  description String
-  mileage     Int
-  total       Decimal @default(0)
-  date        DateTime @default(now())
+  id             String @id @default(uuid())
+  category       Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId     String?
+  vehicle        Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleId      String
+  status         ServiceLogStatus @default(ACTIVE)
+  description    String
+  mileage        Int
+  total          Decimal @default(0)
+  date           DateTime @default(now())
+  correctedLogId String? @unique
+  correctReason  String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
-
-  @@map("logs")
+  
+  @@map("service_logs")
 }

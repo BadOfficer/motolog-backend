@@ -4,29 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateLogDto } from './dto/create-log.dto';
-import { VehiclesService } from '../vehicles/vehicles.service';
-import { UpdateLogDto } from './dto/update-log.dto';
+import { CreateServiceLogDto } from './dto/create-service-log.dto';
+import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
 
 @Injectable()
 export class ServiceLogsService {
-  private static readonly CHANGE_TIME_MS = 15 * 60 * 1000;
-
-  constructor(
-    private readonly prismaService: PrismaService,
-    private readonly vehiclesService: VehiclesService,
-  ) {}
-
-  private async validateRecord(
+  constructor(private readonly prismaService: PrismaService) {}
+  private async validateRecordMileage(
     vehicleId: string,
+    newMileage: number,
     date: Date,
-    mileage: number,
-    excludeId?: string,
   ) {
     const prevRecord = await this.prismaService.serviceLog.findFirst({
       where: {
-        vehicleId: vehicleId,
-        id: excludeId ? { not: excludeId } : undefined,
+        vehicleId,
         date: {
           lt: date,
         },
@@ -38,8 +29,7 @@ export class ServiceLogsService {
 
     const nextRecord = await this.prismaService.serviceLog.findFirst({
       where: {
-        vehicleId: vehicleId,
-        id: excludeId ? { not: excludeId } : undefined,
+        vehicleId,
         date: {
           gt: date,
         },
@@ -49,141 +39,97 @@ export class ServiceLogsService {
       },
     });
 
-    if (prevRecord && prevRecord.mileage > mileage) {
+    if (prevRecord && prevRecord.mileage >= newMileage) {
       throw new BadRequestException(
-        `Mileage can't be less than mileage in record before new record`,
+        `Mileage must be greater than ${prevRecord.mileage}`,
       );
     }
 
-    if (nextRecord && nextRecord.mileage < mileage) {
+    if (nextRecord && nextRecord.mileage <= newMileage) {
       throw new BadRequestException(
-        `Mileage can't be greater than mileage in record after new record`,
+        `Mileage must be less than ${nextRecord.mileage}`,
       );
     }
   }
 
-  private canChange(lastModifyDate: Date) {
-    const updateMinutes = lastModifyDate.getTime();
-    const timeDifference = Date.now() - updateMinutes;
-
-    return timeDifference <= ServiceLogsService.CHANGE_TIME_MS;
-  }
-
-  async findById(logId: string) {
-    const log = await this.prismaService.serviceLog.findUnique({
+  async findById(id: string) {
+    const existLog = await this.prismaService.serviceLog.findUnique({
       where: {
-        id: logId,
+        id,
       },
     });
 
-    if (!log) {
-      throw new NotFoundException(`Service log with id - ${logId} not found`);
+    if (!existLog) {
+      throw new NotFoundException(`Service log with ID - ${id} not found`);
     }
 
-    return log;
+    return existLog;
   }
 
-  async create(createLogDto: CreateLogDto) {
-    const vehicle = await this.vehiclesService.findById(createLogDto.vehicleId);
+  async create(dto: CreateServiceLogDto) {
+    const recordDate = new Date(dto.date);
 
-    const recordDate = new Date(createLogDto.date);
-
-    await this.validateRecord(
-      createLogDto.vehicleId,
-      recordDate,
-      createLogDto.mileage,
-    );
-
-    if (createLogDto.mileage > vehicle.currentMileage) {
-      await this.vehiclesService.updateMileage(
-        createLogDto.vehicleId,
-        createLogDto.mileage,
-      );
-    }
-
-    return this.prismaService.serviceLog.create({
-      data: { ...createLogDto, date: recordDate },
-    });
-  }
-
-  async update(logId: string, updateLogDto: UpdateLogDto) {
-    const existLog = await this.findById(logId);
-    const newDate = new Date(updateLogDto.date);
-
-    await this.validateRecord(
-      existLog.vehicleId,
-      newDate,
-      updateLogDto.mileage,
-      existLog.id,
-    );
-
-    if (!this.canChange(existLog.createdAt)) {
-      throw new BadRequestException('The time for change is over');
-    }
+    await this.validateRecordMileage(dto.vehicleId, dto.mileage, recordDate);
 
     return this.prismaService.$transaction(async (tx) => {
-      const updatedLog = await tx.serviceLog.update({
-        where: {
-          id: logId,
-        },
+      const newLog = await tx.serviceLog.create({
         data: {
-          ...updateLogDto,
-          date: newDate,
+          ...dto,
+          date: recordDate,
         },
       });
 
-      const latestLog = await tx.serviceLog.findFirst({
+      const vehicle = await this.prismaService.vehicle.findUnique({
         where: {
-          vehicleId: existLog.vehicleId,
-        },
-        orderBy: {
-          date: 'desc',
+          id: dto.vehicleId,
         },
       });
 
-      if (latestLog && latestLog.id === logId) {
-        await this.vehiclesService.updateMileage(
-          existLog.vehicleId,
-          latestLog.mileage,
-        );
+      if (!vehicle) {
+        throw new NotFoundException(`Vehicle not found`);
       }
 
-      return updatedLog;
+      if (newLog.mileage > vehicle.currentMileage) {
+        await this.prismaService.vehicle.update({
+          where: {
+            id: dto.vehicleId,
+          },
+          data: {
+            currentMileage: newLog.mileage,
+            lastMileageUpdate: new Date(),
+          },
+        });
+      }
+
+      return newLog;
     });
   }
 
-  async delete(logId: string) {
-    const log = await this.findById(logId);
+  async correct(id: string, dto: CorrectServiceLogDto) {
+    await this.findById(id);
 
-    const isCanDelete = this.canChange(log.createdAt);
-    if (!isCanDelete) {
-      throw new BadRequestException('Time is out');
-    }
+    const recordDate = new Date(dto.date);
 
-    await this.prismaService.$transaction(async (tx) => {
-      await tx.serviceLog.delete({
+    await this.validateRecordMileage(dto.vehicleId, dto.mileage, recordDate);
+
+    return this.prismaService.$transaction(async (tx) => {
+      await tx.serviceLog.update({
         where: {
-          id: logId,
+          id: id,
+        },
+        data: {
+          correctedLogId: id,
+          status: 'CORRECTED',
         },
       });
 
-      const lastLog = await tx.serviceLog.findFirst({
-        where: {
-          vehicleId: log.vehicleId,
-        },
-        orderBy: {
-          date: 'desc',
+      return tx.serviceLog.create({
+        data: {
+          ...dto,
+          status: 'ACTIVE',
+          date: recordDate,
         },
       });
-
-      if (lastLog?.mileage) {
-        await this.vehiclesService.updateMileage(
-          lastLog.vehicleId,
-          lastLog.mileage,
-        );
-      }
     });
-
-    return 'Service log has been deleted';
   }
 }
