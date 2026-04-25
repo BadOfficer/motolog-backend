@@ -18,7 +18,8 @@ export class CreateServiceLogDto {
 
   @IsInt()
   @IsNotEmpty({ message: 'Total is required' })
-  total!: number;
+  totalCost!: number;
 
+  @IsString()
   date!: Date;
 }

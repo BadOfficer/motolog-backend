@@ -5,10 +5,6 @@ export class CorrectServiceLogDto {
   @IsNotEmpty({ message: 'Category Id is required' })
   categoryId!: string;
 
-  @IsString({ message: 'Vehicle Id must be a string' })
-  @IsNotEmpty({ message: 'Vehicle Id is required' })
-  vehicleId!: string;
-
   @IsString({ message: 'Description must be a string' })
   @IsNotEmpty({ message: 'Description is required' })
   description!: string;
@@ -19,8 +15,9 @@ export class CorrectServiceLogDto {
 
   @IsInt()
   @IsNotEmpty({ message: 'Total is required' })
-  total!: number;
+  totalCost!: number;
 
+  @IsString()
   date!: Date;
 
   @IsString({ message: 'Correcting reason must be a string' })

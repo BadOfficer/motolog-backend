@@ -71,8 +71,9 @@ model Vehicle {
 model Category {
   id            String @id @default(uuid())
   title         String @unique
-  serviceLogs   ServiceLog[]
   isSystem      Boolean @default(false)
+  slug          String @unique
+  serviceLogs   ServiceLog[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
@@ -83,21 +84,22 @@ model Category {
 enum ServiceLogStatus {
   ACTIVE
   CORRECTED
+  DELETED
 }
 
 model ServiceLog {
   id             String @id @default(uuid())
+  status         ServiceLogStatus @default(ACTIVE)
+  description    String
+  mileage        Int
+  totalCost      Decimal @default(0)
+  date           DateTime @default(now())
+  correctedLogId String? @unique
+  correctReason  String?
   category       Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId     String?
   vehicle        Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   vehicleId      String
-  status         ServiceLogStatus @default(ACTIVE)
-  description    String
-  mileage        Int
-  total          Decimal @default(0)
-  date           DateTime @default(now())
-  correctedLogId String? @unique
-  correctReason  String?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())

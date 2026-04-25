@@ -12,6 +12,7 @@ import {
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceLogDto } from '../service-logs/dto/create-service-log.dto';
+import { SYSTEM_CATEGORIES } from 'src/constants/system-categories';
 
 @Injectable()
 export class VehiclesService {
@@ -90,19 +91,19 @@ export class VehiclesService {
         },
       });
 
-      const systemCategory = await tx.category.findFirst({
+      const systemCategory = await tx.category.findUnique({
         where: {
-          isSystem: true,
+          slug: SYSTEM_CATEGORIES.registration.slug,
         },
       });
 
       const initialServiceLog: CreateServiceLogDto = {
         categoryId: systemCategory?.id || null,
         vehicleId: createdVehicle.id,
-        description: 'Vehicle registration',
+        description: 'First vehicle registration',
         mileage: createdVehicle.currentMileage,
         date: createdVehicle.createdAt,
-        total: 0,
+        totalCost: 0,
       };
 
       await tx.serviceLog.create({

@@ -18,6 +18,7 @@ export class ServiceLogsService {
     const prevRecord = await this.prismaService.serviceLog.findFirst({
       where: {
         vehicleId,
+        status: 'ACTIVE',
         date: {
           lt: date,
         },
@@ -30,6 +31,7 @@ export class ServiceLogsService {
     const nextRecord = await this.prismaService.serviceLog.findFirst({
       where: {
         vehicleId,
+        status: 'ACTIVE',
         date: {
           gt: date,
         },
@@ -50,6 +52,11 @@ export class ServiceLogsService {
         `Mileage must be less than ${nextRecord.mileage}`,
       );
     }
+
+    return {
+      nextRecord,
+      prevRecord,
+    };
   }
 
   async findById(id: string) {
@@ -106,11 +113,15 @@ export class ServiceLogsService {
   }
 
   async correct(id: string, dto: CorrectServiceLogDto) {
-    await this.findById(id);
+    const log = await this.findById(id);
 
     const recordDate = new Date(dto.date);
 
-    await this.validateRecordMileage(dto.vehicleId, dto.mileage, recordDate);
+    const { nextRecord } = await this.validateRecordMileage(
+      log.vehicleId,
+      dto.mileage,
+      recordDate,
+    );
 
     return this.prismaService.$transaction(async (tx) => {
       await tx.serviceLog.update({
@@ -120,16 +131,44 @@ export class ServiceLogsService {
         data: {
           correctedLogId: id,
           status: 'CORRECTED',
+          correctReason: dto.correctReason,
         },
       });
+
+      if (!nextRecord) {
+        await tx.vehicle.update({
+          where: {
+            id: log.vehicleId,
+          },
+          data: {
+            currentMileage: dto.mileage,
+            lastMileageUpdate: new Date(),
+          },
+        });
+      }
 
       return tx.serviceLog.create({
         data: {
           ...dto,
+          correctReason: null,
+          vehicleId: log.vehicleId,
           status: 'ACTIVE',
           date: recordDate,
         },
       });
+    });
+  }
+
+  async delete(id: string) {
+    await this.findById(id);
+
+    return this.prismaService.serviceLog.update({
+      where: {
+        id,
+      },
+      data: {
+        status: 'DELETED',
+      },
     });
   }
 }
