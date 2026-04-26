@@ -48,11 +48,40 @@ model OAuthAccount {
   @@map("oauth_accounts")
 }
 
+model Make {
+  id              String @id @default(uuid())
+  title           String
+  slug            String @unique
+  externalId      Int? @unique
+  isSynced        Boolean? @default(false)
+  models          Model[]
+  vehicles        Vehicle[]
+
+  @@map("makes")
+}
+
+model Model {
+  id            String @id @default(uuid())
+  name          String
+  externalId    Int? @unique
+  makeId        String
+  make          Make @relation(fields: [makeId], references: [id])
+  vehicles      Vehicle[]
+
+  @@unique([name, makeId])
+  @@map("models")
+}
+
 model Vehicle {
   id              String @id @default(uuid())
   vin             String @unique
-  make            String
-  model           String
+
+  makeId          String
+  make            Make @relation(fields: [makeId], references: [id])
+
+  modelId         String
+  model           Model @relation(fields: [modelId], references: [id])
+
   year            Int
   fuelType        String
   currentMileage  Int

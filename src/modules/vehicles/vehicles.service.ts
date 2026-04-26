@@ -13,12 +13,16 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceLogDto } from '../service-logs/dto/create-service-log.dto';
 import { SYSTEM_CATEGORIES } from 'src/constants/system-categories';
+import { VehiclesMakesService } from '../vehicles-makes/vehicles-makes.service';
+import { VehiclesModelsService } from '../vehicles-models/vehicles-models.service';
 
 @Injectable()
 export class VehiclesService {
   constructor(
     private readonly httpService: HttpService,
     private readonly prismaService: PrismaService,
+    private readonly vehicleMakesService: VehiclesMakesService,
+    private readonly vehicleModelsService: VehiclesModelsService,
   ) {}
 
   async decodeVin(vin: string): Promise<DecodeVinResponse> {
@@ -58,6 +62,18 @@ export class VehiclesService {
       where: {
         id,
       },
+      include: {
+        make: {
+          select: {
+            title: true,
+          },
+        },
+        model: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     if (!existVehicle) {
@@ -82,6 +98,9 @@ export class VehiclesService {
         `Car with vin - ${createVehicleDto.vin} or with plates - ${createVehicleDto.licensePlate} is exist`,
       );
     }
+
+    await this.vehicleMakesService.getById(createVehicleDto.makeId);
+    await this.vehicleModelsService.getModelById(createVehicleDto.modelId);
 
     return this.prismaService.$transaction(async (tx) => {
       const createdVehicle = await tx.vehicle.create({

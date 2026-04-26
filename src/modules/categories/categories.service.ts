@@ -5,21 +5,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CategoryDto } from './dto/category.dto';
-
-import slugify from 'slugify';
+import { getSlug } from 'src/helpers/getSlug';
 
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prismaService: PrismaService) {}
-
-  private generateSlug(title: string) {
-    return slugify(title, {
-      lower: true,
-      trim: true,
-      replacement: '-',
-      remove: undefined,
-    });
-  }
 
   private async canChange(id: string) {
     const existCategory = await this.prismaService.category.findUnique({
@@ -64,7 +54,7 @@ export class CategoriesService {
       );
     }
 
-    const slug = this.generateSlug(categoryDto.title);
+    const slug = getSlug(categoryDto.title);
 
     return this.prismaService.category.create({
       data: {

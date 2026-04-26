@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { VehiclesService } from './vehicles.service';
 import { DecodeVinDto } from './dto/decode-vin.dto';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
@@ -23,5 +23,11 @@ export class VehiclesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.vehiclesService.createVehicle(createVehicleDto, user.id);
+  }
+
+  @Get('/:id')
+  @UseGuards(JwtAuthGuard)
+  async getVehicleById(@Param('id') id: string) {
+    return this.vehiclesService.findById(id);
   }
 }

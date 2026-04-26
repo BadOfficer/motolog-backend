@@ -15,13 +15,13 @@ export class CreateVehicleDto {
   @IsVin()
   vin!: string;
 
-  @IsString({ message: 'Make must be a string' })
-  @IsNotEmpty({ message: 'Make is required' })
-  make!: string;
+  @IsString({ message: 'Make ID must be a string' })
+  @IsNotEmpty({ message: 'Make ID is required' })
+  makeId!: string;
 
-  @IsString({ message: 'Model must be a string' })
-  @IsNotEmpty({ message: 'Model is required' })
-  model!: string;
+  @IsString({ message: 'Model ID must be a string' })
+  @IsNotEmpty({ message: 'Model ID is required' })
+  modelId!: string;
 
   @IsInt({ message: 'Year must be an integer' })
   @Min(1886, { message: 'Year must be greater than 1885' })

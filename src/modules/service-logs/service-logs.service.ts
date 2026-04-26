@@ -115,6 +115,10 @@ export class ServiceLogsService {
   async correct(id: string, dto: CorrectServiceLogDto) {
     const log = await this.findById(id);
 
+    if (log.status === 'CORRECTED') {
+      throw new BadRequestException(`You cannot correct corrected log before`);
+    }
+
     const recordDate = new Date(dto.date);
 
     const { nextRecord } = await this.validateRecordMileage(
