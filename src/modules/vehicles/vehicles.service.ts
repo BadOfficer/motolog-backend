@@ -122,11 +122,15 @@ export class VehiclesService {
         description: 'First vehicle registration',
         mileage: createdVehicle.currentMileage,
         date: createdVehicle.createdAt,
-        totalCost: 0,
+        subTotal: 0,
       };
 
       await tx.serviceLog.create({
-        data: initialServiceLog,
+        data: {
+          ...initialServiceLog,
+          total: 0,
+          parts: undefined,
+        },
       });
 
       return createdVehicle.id;

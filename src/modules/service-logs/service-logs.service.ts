@@ -6,10 +6,21 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
+import { PartDto } from './dto/part.dto';
 
 @Injectable()
 export class ServiceLogsService {
   constructor(private readonly prismaService: PrismaService) {}
+
+  private calculateTotal(parts: PartDto[], subTotal: number) {
+    const partsTotal = parts.reduce(
+      (sum, part) => sum + part.price * part.quantity,
+      0,
+    );
+
+    return partsTotal + subTotal;
+  }
+
   private async validateRecordMileage(
     vehicleId: string,
     newMileage: number,
@@ -78,11 +89,21 @@ export class ServiceLogsService {
 
     await this.validateRecordMileage(dto.vehicleId, dto.mileage, recordDate);
 
+    const parts = dto?.parts || [];
+
+    const total = this.calculateTotal(parts, dto.subTotal);
+
     return this.prismaService.$transaction(async (tx) => {
       const newLog = await tx.serviceLog.create({
         data: {
           ...dto,
+          total,
           date: recordDate,
+          parts: {
+            createMany: {
+              data: parts,
+            },
+          },
         },
       });
 
@@ -127,13 +148,32 @@ export class ServiceLogsService {
       recordDate,
     );
 
+    const parts = dto?.parts ?? [];
+
+    const total = this.calculateTotal(parts, dto.subTotal);
+
     return this.prismaService.$transaction(async (tx) => {
+      const newLog = await tx.serviceLog.create({
+        data: {
+          ...dto,
+          vehicleId: log.vehicleId,
+          total,
+          date: recordDate,
+          status: 'ACTIVE',
+          parts: {
+            createMany: {
+              data: parts,
+            },
+          },
+        },
+      });
+
       await tx.serviceLog.update({
         where: {
           id: id,
         },
         data: {
-          correctedLogId: id,
+          correctedLogId: newLog.id,
           status: 'CORRECTED',
           correctReason: dto.correctReason,
         },
@@ -151,15 +191,7 @@ export class ServiceLogsService {
         });
       }
 
-      return tx.serviceLog.create({
-        data: {
-          ...dto,
-          correctReason: null,
-          vehicleId: log.vehicleId,
-          status: 'ACTIVE',
-          date: recordDate,
-        },
-      });
+      return newLog;
     });
   }
 

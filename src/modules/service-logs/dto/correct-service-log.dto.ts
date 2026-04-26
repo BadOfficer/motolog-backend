@@ -1,4 +1,13 @@
-import { IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { PartDto } from './part.dto';
 
 export class CorrectServiceLogDto {
   @IsString({ message: 'Category Id must be a string' })
@@ -15,7 +24,8 @@ export class CorrectServiceLogDto {
 
   @IsInt()
   @IsNotEmpty({ message: 'Total is required' })
-  totalCost!: number;
+  @Min(0)
+  subTotal!: number;
 
   @IsString()
   date!: Date;
@@ -23,4 +33,9 @@ export class CorrectServiceLogDto {
   @IsString({ message: 'Correcting reason must be a string' })
   @IsNotEmpty({ message: 'Correcting reason is required' })
   correctReason!: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => PartDto)
+  parts?: PartDto[];
 }

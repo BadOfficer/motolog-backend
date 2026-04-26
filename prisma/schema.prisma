@@ -119,19 +119,38 @@ enum ServiceLogStatus {
 model ServiceLog {
   id             String @id @default(uuid())
   status         ServiceLogStatus @default(ACTIVE)
-  description    String
+  description    String?
   mileage        Int
-  totalCost      Decimal @default(0)
+  total          Decimal @default(0)
+  subTotal       Decimal @default(0)
   date           DateTime @default(now())
   correctedLogId String? @unique
   correctReason  String?
+  parts          Part[]
   category       Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId     String?
   vehicle        Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   vehicleId      String
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt @default(now())
   
   @@map("service_logs")
+}
+
+model Part {
+  id            String @id @default(uuid())
+  name          String
+  brand         String?
+  description   String?
+  partNumber    String?
+  price         Decimal
+  quantity      Int @default(1)
+  serviceLogId  String
+  serviceLog    ServiceLog @relation(fields: [serviceLogId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+  
+  @@map("parts")
 }

@@ -1,4 +1,14 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { PartDto } from './part.dto';
+import { Type } from 'class-transformer';
 
 export class CreateServiceLogDto {
   @IsOptional()
@@ -17,8 +27,13 @@ export class CreateServiceLogDto {
   mileage!: number;
 
   @IsInt()
-  @IsNotEmpty({ message: 'Total is required' })
-  totalCost!: number;
+  @Min(0)
+  subTotal!: number;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => PartDto)
+  parts?: PartDto[];
 
   @IsString()
   date!: Date;
