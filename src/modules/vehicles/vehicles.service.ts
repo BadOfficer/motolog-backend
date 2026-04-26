@@ -139,6 +139,21 @@ export class VehiclesService {
 
   async updateMileage(id: string, newMileage: number) {
     await this.findById(id);
+    const lastLog = await this.prismaService.serviceLog.findFirst({
+      where: {
+        vehicleId: id,
+        status: 'ACTIVE',
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    if (lastLog && lastLog.mileage > newMileage) {
+      throw new BadRequestException(
+        `Mileage cannot be less than ${lastLog.mileage}`,
+      );
+    }
 
     return this.prismaService.vehicle.update({
       where: {

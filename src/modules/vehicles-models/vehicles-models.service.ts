@@ -50,11 +50,12 @@ export class VehiclesModelsService {
 
       await this.prismaService.$transaction(async (tx) => {
         if (responseModels.length > 0) {
-          const modelsData: Omit<Model, 'id'>[] = responseModels.map((md) => ({
-            name: md.Model_Name,
-            externalId: md.Model_ID,
-            makeId: make.id,
-          }));
+          const modelsData: Pick<Model, 'name' | 'externalId' | 'makeId'>[] =
+            responseModels.map((md) => ({
+              name: md.Model_Name,
+              externalId: md.Model_ID,
+              makeId: make.id,
+            }));
 
           await tx.model.createMany({
             data: modelsData,
