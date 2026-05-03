@@ -9,11 +9,18 @@ import { ServiceLogsModule } from './modules/service-logs/service-logs.module';
 import { VehiclesMakesModule } from './modules/vehicles-makes/vehicles-makes.module';
 import { VehiclesModelsModule } from './modules/vehicles-models/vehicles-models.module';
 import { GlobalHttpModule } from './modules/http/http.module';
+import { Express } from 'express';
+import { Multer } from 'multer';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
     }),
     GlobalHttpModule,
     PrismaModule,

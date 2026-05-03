@@ -26,6 +26,7 @@ model User {
   lastName  String
   accounts  OAuthAccount[]
   vehicles  Vehicle[]
+  avatar    String?
 
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt @default(now())
@@ -96,6 +97,7 @@ model Vehicle {
   userId          String
   serviceLogs            ServiceLog[]
   lastMileageUpdate DateTime   @default(now())
+  image             String?
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -137,6 +139,7 @@ model ServiceLog {
   categoryId     String?
   vehicle        Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   vehicleId      String
+  media          String[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt @default(now())

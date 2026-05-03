@@ -1,12 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { VehiclesService } from './vehicles.service';
 import { DecodeVinDto } from './dto/decode-vin.dto';
@@ -14,6 +17,8 @@ import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -46,6 +51,33 @@ export class VehiclesController {
     @Param('id') id: string,
     @Query('mileage') mileage: string,
   ) {
-    return this.vehiclesService.updateMileage(id, +mileage);
+    const { currentMileage, ...dto } = new UpdateVehicleDto();
+
+    return this.vehiclesService.update(id, {
+      ...dto,
+      currentMileage: +mileage,
+    });
+  }
+
+  @Patch('/update-image/:id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  async updateImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.updateImage(id, file);
+  }
+
+  @Patch('/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateVehicle(@Param('id') id: string, @Body() dto: UpdateVehicleDto) {
+    return this.vehiclesService.update(id, dto);
+  }
+
+  @Delete('/remove-image/:id')
+  @UseGuards(JwtAuthGuard)
+  async removeImage(@Param('id') id: string) {
+    return this.vehiclesService.removeImage(id);
   }
 }
