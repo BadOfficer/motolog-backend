@@ -6,7 +6,10 @@ import {
   Min,
 } from 'class-validator';
 
-export class PartDto {
+export class ServiceLogItemDto {
+  @IsOptional()
+  id?: string;
+
   @IsNotEmpty({ message: 'Name is required' })
   @IsString({ message: 'Name must be an string' })
   name!: string;
@@ -25,7 +28,7 @@ export class PartDto {
 
   @IsNumber()
   @IsNotEmpty({ message: 'Price is required' })
-  price!: number;
+  unitPrice!: number;
 
   @IsNumber()
   @Min(1)

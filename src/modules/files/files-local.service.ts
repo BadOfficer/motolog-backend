@@ -48,4 +48,8 @@ export class FilesLocalService extends FilesService {
 
     return filepath;
   }
+
+  async removeFiles(filepath: string[]): Promise<string[]> {
+    return Promise.all(filepath.map((path) => this.removeFile(path)));
+  }
 }

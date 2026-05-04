@@ -66,7 +66,7 @@ export class VehiclesController {
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.updateImage(id, file);
+    return this.vehiclesService.updateImage(id, file);
   }
 
   @Patch('/:id')

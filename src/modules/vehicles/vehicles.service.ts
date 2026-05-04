@@ -19,7 +19,6 @@ import { VehiclesModelsService } from '../vehicles-models/vehicles-models.servic
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { isImage } from 'src/utils/file-validation';
 import { FilesService } from '../files/files.service';
-import { Vehicle } from 'src/generated/prisma/client';
 
 @Injectable()
 export class VehiclesService {
@@ -135,7 +134,7 @@ export class VehiclesService {
         data: {
           ...initialServiceLog,
           total: 0,
-          parts: undefined,
+          items: undefined,
         },
       });
 
@@ -143,32 +142,8 @@ export class VehiclesService {
     });
   }
 
-  private async validateMileage(id: string, mileage: number) {
-    const lastLog = await this.prismaService.serviceLog.findFirst({
-      where: {
-        vehicleId: id,
-        status: 'ACTIVE',
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
-
-    if (lastLog && lastLog.mileage > mileage) {
-      throw new BadRequestException(
-        `Mileage cannot be less than ${lastLog.mileage}`,
-      );
-    }
-  }
-
   async update(id: string, dto: UpdateVehicleDto) {
     const vehicle = await this.findById(id);
-    let currentMileage = vehicle.currentMileage;
-
-    if (dto.currentMileage) {
-      await this.validateMileage(vehicle.id, dto.currentMileage);
-      currentMileage = dto.currentMileage;
-    }
 
     return this.prismaService.vehicle.update({
       where: {

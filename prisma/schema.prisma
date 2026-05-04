@@ -134,12 +134,18 @@ model ServiceLog {
   date           DateTime @default(now())
   correctedLogId String? @unique
   correctReason  String?
-  parts          Part[]
+  items          ServiceLogItem[]
+
+  isMileageValid Boolean? @default(false)
+  mileageWarnings String[]
+
   category       Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId     String?
+
   vehicle        Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   vehicleId      String
-  media          String[]
+
+  media          ServiceLogMedia[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt @default(now())
@@ -147,19 +153,33 @@ model ServiceLog {
   @@map("service_logs")
 }
 
-model Part {
+model ServiceLogItem {
   id            String @id @default(uuid())
   name          String
   brand         String?
   description   String?
   partNumber    String?
-  price         Decimal
+  unitPrice     Decimal
   quantity      Int @default(1)
+
   serviceLogId  String
   serviceLog    ServiceLog @relation(fields: [serviceLogId], references: [id], onDelete: Cascade)
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt @default(now())
   
-  @@map("parts")
+  @@map("service_logs_items")
+}
+
+model ServiceLogMedia {
+  id            String @id @default(uuid())
+  url           String
+
+  serviceLogId  String
+  serviceLog    ServiceLog @relation(fields: [serviceLogId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+  
+  @@map("servce_logs_media")
 }

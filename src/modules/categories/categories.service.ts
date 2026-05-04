@@ -4,8 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CategoryDto } from './dto/category.dto';
+import { CreateCategoryDto } from './dto/create-category.dto';
 import { getSlug } from 'src/helpers/getSlug';
+import { UpdateCategoryDto } from './dto/update-category';
 
 @Injectable()
 export class CategoriesService {
@@ -41,7 +42,7 @@ export class CategoriesService {
     return existCategory;
   }
 
-  async create(categoryDto: CategoryDto) {
+  async create(categoryDto: CreateCategoryDto) {
     const existCategory = await this.prismaService.category.findUnique({
       where: {
         title: categoryDto.title,
@@ -64,7 +65,7 @@ export class CategoriesService {
     });
   }
 
-  async update(id: string, categoryDto: CategoryDto) {
+  async update(id: string, categoryDto: UpdateCategoryDto) {
     await this.canChange(id);
 
     return this.prismaService.category.update({

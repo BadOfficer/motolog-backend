@@ -11,4 +11,6 @@ export abstract class FilesService {
     folder?: string,
   ): Promise<string[]>;
   abstract removeFile(filepath: string): Promise<string>;
+
+  abstract removeFiles(filepath: string[]): Promise<string[]>;
 }

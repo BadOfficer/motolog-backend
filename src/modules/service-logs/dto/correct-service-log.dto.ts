@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsDate,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -7,7 +8,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PartDto } from './part.dto';
+import { ServiceLogItemDto } from './service-log-item.dto';
 
 export class CorrectServiceLogDto {
   @IsString({ message: 'Category Id must be a string' })
@@ -27,7 +28,9 @@ export class CorrectServiceLogDto {
   @Min(0)
   subTotal!: number;
 
-  @IsString()
+  @Type(() => Date)
+  @IsDate()
+  @IsNotEmpty()
   date!: Date;
 
   @IsString({ message: 'Correcting reason must be a string' })
@@ -36,6 +39,6 @@ export class CorrectServiceLogDto {
 
   @IsOptional()
   @ValidateNested({ each: true })
-  @Type(() => PartDto)
-  parts?: PartDto[];
+  @Type(() => ServiceLogItemDto)
+  items?: ServiceLogItemDto[];
 }

@@ -6,15 +6,19 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
-import { PartDto } from './dto/part.dto';
+import { ServiceLogItemDto } from './dto/service-log-item.dto';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class ServiceLogsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly filesService: FilesService,
+  ) {}
 
-  private calculateTotal(parts: PartDto[], subTotal: number) {
-    const partsTotal = parts.reduce(
-      (sum, part) => sum + part.price * part.quantity,
+  private calculateTotal(items: ServiceLogItemDto[], subTotal: number) {
+    const partsTotal = items.reduce(
+      (sum, part) => sum + part.unitPrice * part.quantity,
       0,
     );
 
@@ -52,19 +56,23 @@ export class ServiceLogsService {
       },
     });
 
+    const warnings: string[] = [];
+
     if (prevRecord && prevRecord.mileage >= newMileage) {
-      throw new BadRequestException(
-        `Mileage must be greater than ${prevRecord.mileage}`,
+      warnings.push(
+        `Mileage is lower than previous record: ${prevRecord.mileage}`,
       );
     }
 
     if (nextRecord && nextRecord.mileage <= newMileage) {
-      throw new BadRequestException(
-        `Mileage must be less than ${nextRecord.mileage}`,
+      warnings.push(
+        `Mileage is higher than next record: ${nextRecord.mileage}`,
       );
     }
 
     return {
+      isValid: warnings.length === 0,
+      warnings,
       nextRecord,
       prevRecord,
     };
@@ -85,23 +93,27 @@ export class ServiceLogsService {
   }
 
   async create(dto: CreateServiceLogDto) {
-    const recordDate = new Date(dto.date);
+    const { isValid, warnings } = await this.validateRecordMileage(
+      dto.vehicleId,
+      dto.mileage,
+      dto.date,
+    );
 
-    await this.validateRecordMileage(dto.vehicleId, dto.mileage, recordDate);
+    const items = dto?.items || [];
 
-    const parts = dto?.parts || [];
-
-    const total = this.calculateTotal(parts, dto.subTotal);
+    const total = this.calculateTotal(items, dto.subTotal);
 
     return this.prismaService.$transaction(async (tx) => {
       const newLog = await tx.serviceLog.create({
         data: {
           ...dto,
           total,
-          date: recordDate,
-          parts: {
+          date: dto.date,
+          mileageWarnings: warnings,
+          isMileageValid: isValid,
+          items: {
             createMany: {
-              data: parts,
+              data: items,
             },
           },
         },
@@ -136,21 +148,24 @@ export class ServiceLogsService {
   async correct(id: string, dto: CorrectServiceLogDto) {
     const log = await this.findById(id);
 
-    if (log.status === 'CORRECTED') {
-      throw new BadRequestException(`You cannot correct corrected log before`);
+    switch (log.status) {
+      case 'CORRECTED':
+        throw new BadRequestException(
+          `You cannot correct corrected log before`,
+        );
+      case 'DELETED':
+        throw new BadRequestException(`You cannot correct deleted log`);
     }
 
-    const recordDate = new Date(dto.date);
-
-    const { nextRecord } = await this.validateRecordMileage(
+    const { nextRecord, isValid, warnings } = await this.validateRecordMileage(
       log.vehicleId,
       dto.mileage,
-      recordDate,
+      dto.date,
     );
 
-    const parts = dto?.parts ?? [];
+    const items = dto?.items ?? [];
 
-    const total = this.calculateTotal(parts, dto.subTotal);
+    const total = this.calculateTotal(items, dto.subTotal);
 
     return this.prismaService.$transaction(async (tx) => {
       const newLog = await tx.serviceLog.create({
@@ -158,11 +173,13 @@ export class ServiceLogsService {
           ...dto,
           vehicleId: log.vehicleId,
           total,
-          date: recordDate,
+          isMileageValid: isValid,
+          mileageWarnings: warnings,
+          date: dto.date,
           status: 'ACTIVE',
-          parts: {
+          items: {
             createMany: {
-              data: parts,
+              data: items,
             },
           },
         },
@@ -195,15 +212,65 @@ export class ServiceLogsService {
     });
   }
 
+  async updateMedia(
+    id: string,
+    files: Express.Multer.File[] = [],
+    idsToDelete: string[] = [],
+  ) {
+    const mediaToDelete = await this.prismaService.serviceLogMedia.findMany({
+      where: {
+        id: { in: idsToDelete },
+        serviceLogId: id,
+      },
+    });
+
+    const savedFiles =
+      files.length > 0 ? await this.filesService.saveFiles(files) : [];
+
+    try {
+      const urlsToDelete = await this.prismaService.$transaction(async (tx) => {
+        if (idsToDelete.length > 0) {
+          await tx.serviceLogMedia.deleteMany({
+            where: {
+              id: { in: idsToDelete },
+              serviceLogId: id,
+            },
+          });
+        }
+
+        if (savedFiles.length > 0) {
+          await tx.serviceLogMedia.createMany({
+            data: savedFiles.map((url) => ({
+              serviceLogId: id,
+              url,
+            })),
+          });
+        }
+
+        return mediaToDelete.map((item) => item.url);
+      });
+
+      await this.filesService.removeFiles(urlsToDelete);
+
+      return this.prismaService.serviceLogMedia.findMany({
+        where: { serviceLogId: id },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      if (savedFiles.length > 0) {
+        await this.filesService.removeFiles(savedFiles);
+      }
+
+      throw error;
+    }
+  }
+
   async delete(id: string) {
     await this.findById(id);
 
-    return this.prismaService.serviceLog.update({
+    return this.prismaService.serviceLog.delete({
       where: {
         id,
-      },
-      data: {
-        status: 'DELETED',
       },
     });
   }

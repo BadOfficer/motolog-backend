@@ -1,5 +1,5 @@
 import {
-  IsArray,
+  IsDate,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -7,7 +7,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PartDto } from './part.dto';
+import { ServiceLogItemDto } from './service-log-item.dto';
 import { Type } from 'class-transformer';
 
 export class CreateServiceLogDto {
@@ -32,9 +32,11 @@ export class CreateServiceLogDto {
 
   @IsOptional()
   @ValidateNested({ each: true })
-  @Type(() => PartDto)
-  parts?: PartDto[];
+  @Type(() => ServiceLogItemDto)
+  items?: ServiceLogItemDto[];
 
-  @IsString()
+  @Type(() => Date)
+  @IsDate()
+  @IsNotEmpty()
   date!: Date;
 }
