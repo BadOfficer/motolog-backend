@@ -75,6 +75,15 @@ export class VehiclesController {
     return this.vehiclesService.update(id, dto);
   }
 
+  @Patch(':id/unlink/:userId')
+  @UseGuards(JwtAuthGuard)
+  async unlinkVehicle(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.vehiclesService.unlink(id, userId);
+  }
+
   @Delete(':id/remove-image')
   @UseGuards(JwtAuthGuard)
   async removeImage(@Param('id') id: string) {

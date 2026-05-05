@@ -124,10 +124,41 @@ export class VehiclesService {
       },
     });
 
-    if (existCar) {
+    if (existCar && existCar.userId) {
       throw new BadRequestException(
         `Car with vin - ${dto.vin} or with plates - ${dto.licensePlate} is exist`,
       );
+    }
+
+    if (existCar && !existCar.userId) {
+      return this.prismaService.$transaction(async (tx) => {
+        const updatedVehicle = await tx.vehicle.update({
+          where: {
+            id: existCar.id,
+          },
+          data: {
+            userId,
+          },
+        });
+
+        const systemCategory = await tx.category.findUnique({
+          where: {
+            slug: SYSTEM_CATEGORIES.ownership_transfer.slug,
+          },
+        });
+
+        await tx.serviceLog.create({
+          data: {
+            mileage: updatedVehicle.currentMileage,
+            description: 'Vehicle ownership',
+            categoryId: systemCategory?.id || null,
+            vehicleId: updatedVehicle.id,
+            isMileageValid: true,
+          },
+        });
+
+        return updatedVehicle;
+      });
     }
 
     const vehicleStatus = await this.verifyVehicle(
@@ -165,11 +196,35 @@ export class VehiclesService {
         data: {
           ...initialServiceLog,
           total: 0,
+          isMileageValid: true,
           items: undefined,
         },
       });
 
       return createdVehicle.id;
+    });
+  }
+
+  async unlink(id: string, userId: string) {
+    const vehicle = await this.prismaService.vehicle.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    return this.prismaService.vehicle.update({
+      where: {
+        id,
+        userId,
+      },
+      data: {
+        userId: null,
+      },
     });
   }
 
