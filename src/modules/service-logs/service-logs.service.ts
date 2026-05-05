@@ -171,6 +171,7 @@ export class ServiceLogsService {
       const newLog = await tx.serviceLog.create({
         data: {
           ...dto,
+          correctReason: undefined,
           vehicleId: log.vehicleId,
           total,
           isMileageValid: isValid,
@@ -225,7 +226,9 @@ export class ServiceLogsService {
     });
 
     const savedFiles =
-      files.length > 0 ? await this.filesService.saveFiles(files) : [];
+      files.length > 0
+        ? await this.filesService.saveFiles(files, 'service-logs')
+        : [];
 
     try {
       const urlsToDelete = await this.prismaService.$transaction(async (tx) => {
@@ -263,6 +266,14 @@ export class ServiceLogsService {
 
       throw error;
     }
+  }
+
+  async getByVehicleId(vehicleId: string) {
+    return this.prismaService.serviceLog.findMany({
+      where: {
+        vehicleId,
+      },
+    });
   }
 
   async delete(id: string) {

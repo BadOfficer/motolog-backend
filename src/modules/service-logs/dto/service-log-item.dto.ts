@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsNotEmpty,
   IsNumber,
@@ -7,6 +8,7 @@ import {
 } from 'class-validator';
 
 export class ServiceLogItemDto {
+  @IsString({ message: 'Id must be a string' })
   @IsOptional()
   id?: string;
 
@@ -27,10 +29,13 @@ export class ServiceLogItemDto {
   partNumber?: string;
 
   @IsNumber()
+  @Min(0)
   @IsNotEmpty({ message: 'Price is required' })
+  @Type(() => Number)
   unitPrice!: number;
 
   @IsNumber()
   @Min(1)
+  @Type(() => Number)
   quantity!: number;
 }

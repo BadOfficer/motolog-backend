@@ -45,7 +45,7 @@ export class VehiclesController {
     return this.vehiclesService.findById(id);
   }
 
-  @Patch('/update-mileage/:id')
+  @Patch(':id/update-mileage')
   @UseGuards(JwtAuthGuard)
   async updateVehicleMileage(
     @Param('id') id: string,
@@ -59,7 +59,7 @@ export class VehiclesController {
     });
   }
 
-  @Patch('/update-image/:id')
+  @Patch(':id/update-image')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('image'))
   async updateImage(
@@ -75,7 +75,7 @@ export class VehiclesController {
     return this.vehiclesService.update(id, dto);
   }
 
-  @Delete('/remove-image/:id')
+  @Delete(':id/remove-image')
   @UseGuards(JwtAuthGuard)
   async removeImage(@Param('id') id: string) {
     return this.vehiclesService.removeImage(id);

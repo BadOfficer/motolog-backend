@@ -35,8 +35,11 @@ export class FilesLocalService extends FilesService {
     return join(this.rootFolder, safeFolder, filename);
   }
 
-  async saveFiles(files: Express.Multer.File[]): Promise<string[]> {
-    return Promise.all(files.map((file) => this.saveFile(file)));
+  async saveFiles(
+    files: Express.Multer.File[],
+    folder: string = 'common',
+  ): Promise<string[]> {
+    return Promise.all(files.map((file) => this.saveFile(file, folder)));
   }
 
   async removeFile(filepath: string): Promise<string> {

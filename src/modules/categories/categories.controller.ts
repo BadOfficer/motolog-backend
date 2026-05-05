@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
-import { UpdateCategoryDto } from './dto/update-category';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from 'src/generated/prisma/enums';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -27,6 +27,8 @@ export class CategoriesController {
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async updateCategory(
     @Param('id') id: string,
     @Body() categoryDto: UpdateCategoryDto,
@@ -35,6 +37,8 @@ export class CategoriesController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async deleteCategory(@Param('id') id: string) {
     return this.categoriesService.delete(id);
   }

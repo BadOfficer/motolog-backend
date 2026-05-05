@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   Patch,
   Post,
@@ -26,13 +27,13 @@ export class ServiceLogsController {
     return this.serviceLogsService.create(dto);
   }
 
-  @Patch('/:id')
+  @Patch('/:id/correct')
   @UseGuards(JwtAuthGuard)
   async correctLog(@Param('id') id: string, @Body() dto: CorrectServiceLogDto) {
     return this.serviceLogsService.correct(id, dto);
   }
 
-  @Patch('/update-media/:id')
+  @Patch(':id/update-media')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('media'))
   async updateLogMedia(
@@ -43,6 +44,12 @@ export class ServiceLogsController {
     const deleteIds = idsToDelete !== undefined ? idsToDelete.split(',') : [];
 
     return this.serviceLogsService.updateMedia(id, files, deleteIds);
+  }
+
+  @Get('/for-vehicle/:vehicleId')
+  @UseGuards(JwtAuthGuard)
+  async getLogsByVehicleId(@Param('vehicleId') vehicleId: string) {
+    return this.serviceLogsService.getByVehicleId(vehicleId);
   }
 
   @Delete('/:id')

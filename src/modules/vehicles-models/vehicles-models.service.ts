@@ -1,5 +1,9 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ModelsApiResponse,
@@ -7,6 +11,8 @@ import {
 } from './interfaces/models-api-response.interface';
 import { Model } from 'src/generated/prisma/client';
 import { VehiclesMakesService } from '../vehicles-makes/vehicles-makes.service';
+import { CreateModelDto } from './dto/create-model.dto';
+import { PaginatedResponse } from 'src/interfaces/PaginatedResponse.interface';
 
 @Injectable()
 export class VehiclesModelsService {
@@ -30,8 +36,15 @@ export class VehiclesModelsService {
     return model;
   }
 
-  async getModelsByMakeId(makeId: string) {
+  async getModelsByMakeId(
+    makeId: string,
+    page: number = 1,
+    limit: number = 20,
+    query?: string,
+  ): Promise<PaginatedResponse<Model>> {
     const make = await this.vehicleMakesService.getById(makeId);
+
+    const offset = (page - 1) * limit;
 
     if (!make.isSynced && make.externalId) {
       let responseModels: ModelsApiResponseEntry[] = [];
@@ -74,9 +87,66 @@ export class VehiclesModelsService {
       });
     }
 
-    return this.prismaService.model.findMany({
+    const [data, total] = await this.prismaService.$transaction([
+      this.prismaService.model.findMany({
+        where: {
+          makeId: make.id,
+          name: {
+            contains: query,
+            mode: 'insensitive',
+          },
+        },
+        skip: offset,
+        take: limit,
+        orderBy: {
+          name: 'asc',
+        },
+      }),
+
+      this.prismaService.model.count({
+        where: {
+          makeId: make.id,
+          name: {
+            contains: query,
+            mode: 'insensitive',
+          },
+        },
+      }),
+    ]);
+
+    return {
+      data,
+      totalElements: total,
+    };
+  }
+
+  async create(dto: CreateModelDto) {
+    const make = await this.vehicleMakesService.getById(dto.makeId);
+
+    const existModel = await this.prismaService.model.findFirst({
       where: {
-        makeId: make.id,
+        makeId: dto.makeId,
+        name: dto.name,
+      },
+    });
+
+    if (existModel) {
+      throw new BadRequestException(
+        `Model ${dto.name} is exist for make - ${make.title}`,
+      );
+    }
+
+    return this.prismaService.model.create({
+      data: dto,
+    });
+  }
+
+  async delete(id: string) {
+    await this.getModelById(id);
+
+    return this.prismaService.model.delete({
+      where: {
+        id,
       },
     });
   }

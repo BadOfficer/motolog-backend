@@ -17,6 +17,7 @@ const safeUserSelect = {
   email: true,
   firstName: true,
   lastName: true,
+  role: true,
 } as const;
 
 @Injectable()
@@ -73,14 +74,18 @@ export class UsersService {
   async updateUser(id: string, dto: UpdateUserDto) {
     await this.findUserById(id);
 
-    const existUserByEmail = await this.prismaService.user.findUnique({
-      where: {
-        email: dto.email,
-      },
-    });
+    if (dto.email) {
+      const existUserByEmail = await this.prismaService.user.findUnique({
+        where: {
+          email: dto.email,
+        },
+      });
 
-    if (existUserByEmail) {
-      throw new BadRequestException(`User with email - ${dto.email} is exist`);
+      if (existUserByEmail) {
+        throw new BadRequestException(
+          `User with email - ${dto.email} is exist`,
+        );
+      }
     }
 
     return this.prismaService.user.update({

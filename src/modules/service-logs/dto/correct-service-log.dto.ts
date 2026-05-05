@@ -1,10 +1,12 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDate,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxDate,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -21,22 +23,26 @@ export class CorrectServiceLogDto {
 
   @IsInt()
   @IsNotEmpty({ message: 'Description is required' })
+  @Type(() => Number)
   mileage!: number;
 
   @IsInt()
   @IsNotEmpty({ message: 'Total is required' })
   @Min(0)
+  @Type(() => Number)
   subTotal!: number;
 
   @Type(() => Date)
   @IsDate()
   @IsNotEmpty()
+  @MaxDate(new Date(), { message: 'Date must not be in the future' })
   date!: Date;
 
   @IsString({ message: 'Correcting reason must be a string' })
   @IsNotEmpty({ message: 'Correcting reason is required' })
   correctReason!: string;
 
+  @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => ServiceLogItemDto)

@@ -75,7 +75,7 @@ model Model {
   name          String
   externalId    Int? @unique
   makeId        String
-  make          Make @relation(fields: [makeId], references: [id])
+  make          Make @relation(fields: [makeId], references: [id], onDelete: Cascade)
   vehicles      Vehicle[]
 
   createdAt      DateTime @default(now())
@@ -83,6 +83,12 @@ model Model {
 
   @@unique([name, makeId])
   @@map("models")
+}
+
+enum VehicleStatus {
+  VERIFIED
+  UNVERIFIED
+  NEEDS_REVIEW
 }
 
 model Vehicle {
@@ -96,14 +102,19 @@ model Vehicle {
   model           Model @relation(fields: [modelId], references: [id])
 
   year            Int
-  fuelType        String
   currentMileage  Int
+  primaryFuel     String
+
+  secondaryFuel   String?
+  displacement    String?
   licensePlate    String? @unique
+  
   user            User @relation(fields: [userId], references: [id])
   userId          String
   serviceLogs            ServiceLog[]
   lastMileageUpdate DateTime   @default(now())
   image             String?
+  vehicleStatus   VehicleStatus
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

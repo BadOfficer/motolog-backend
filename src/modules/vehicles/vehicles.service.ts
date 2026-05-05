@@ -19,6 +19,7 @@ import { VehiclesModelsService } from '../vehicles-models/vehicles-models.servic
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { isImage } from 'src/utils/file-validation';
 import { FilesService } from '../files/files.service';
+import { VehicleStatus } from 'src/generated/prisma/enums';
 
 @Injectable()
 export class VehiclesService {
@@ -35,7 +36,9 @@ export class VehiclesService {
       make: null,
       model: null,
       modelYear: null,
-      fuelType: null,
+      primaryFuel: null,
+      secondaryFuel: null,
+      displacement: null,
     };
 
     try {
@@ -88,30 +91,58 @@ export class VehiclesService {
     return existVehicle;
   }
 
-  async createVehicle(createVehicleDto: CreateVehicleDto, userId: string) {
+  async verifyVehicle(
+    makeId: string,
+    modelId: string,
+    vin: string,
+    year: number,
+  ) {
+    const make = await this.vehicleMakesService.getById(makeId);
+    const model = await this.vehicleModelsService.getModelById(modelId);
+
+    const vinData = await this.decodeVin(vin);
+
+    if (!vinData.make || !vinData.model || !vinData.modelYear) {
+      return VehicleStatus.UNVERIFIED;
+    }
+
+    const isValidMake = make.title === vinData.make;
+    const isValidModel = model.name === vinData.model;
+    const isValidYear = year === +vinData.modelYear;
+
+    if (!isValidMake || !isValidModel || !isValidYear) {
+      return VehicleStatus.NEEDS_REVIEW;
+    }
+
+    return VehicleStatus.VERIFIED;
+  }
+
+  async createVehicle(dto: CreateVehicleDto, userId: string) {
     const existCar = await this.prismaService.vehicle.findFirst({
       where: {
-        OR: [
-          { vin: createVehicleDto.vin },
-          { licensePlate: createVehicleDto.licensePlate },
-        ],
+        OR: [{ vin: dto.vin }, { licensePlate: dto.licensePlate }],
       },
     });
 
     if (existCar) {
       throw new BadRequestException(
-        `Car with vin - ${createVehicleDto.vin} or with plates - ${createVehicleDto.licensePlate} is exist`,
+        `Car with vin - ${dto.vin} or with plates - ${dto.licensePlate} is exist`,
       );
     }
 
-    await this.vehicleMakesService.getById(createVehicleDto.makeId);
-    await this.vehicleModelsService.getModelById(createVehicleDto.modelId);
+    const vehicleStatus = await this.verifyVehicle(
+      dto.makeId,
+      dto.modelId,
+      dto.vin,
+      dto.year,
+    );
 
     return this.prismaService.$transaction(async (tx) => {
       const createdVehicle = await tx.vehicle.create({
         data: {
-          ...createVehicleDto,
+          ...dto,
           userId,
+          vehicleStatus: vehicleStatus,
         },
       });
 
@@ -144,6 +175,24 @@ export class VehiclesService {
 
   async update(id: string, dto: UpdateVehicleDto) {
     const vehicle = await this.findById(id);
+    let vehicleStatus = vehicle.vehicleStatus;
+
+    const checkMake = dto.makeId && dto.makeId !== vehicle.makeId;
+    const checkModel = dto.modelId && dto.modelId !== vehicle.modelId;
+    const checkYear = dto.year && dto.year !== vehicle.year;
+
+    if (checkMake || checkModel || checkYear) {
+      const makeId = dto.makeId || vehicle.makeId;
+      const modelId = dto.modelId || vehicle.modelId;
+      const year = dto.year || vehicle.year;
+
+      vehicleStatus = await this.verifyVehicle(
+        makeId,
+        modelId,
+        vehicle.vin,
+        year,
+      );
+    }
 
     return this.prismaService.vehicle.update({
       where: {
@@ -151,6 +200,7 @@ export class VehiclesService {
       },
       data: {
         ...dto,
+        vehicleStatus,
         lastMileageUpdate:
           dto.currentMileage !== undefined ? new Date() : undefined,
       },
