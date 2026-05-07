@@ -131,34 +131,7 @@ export class VehiclesService {
     }
 
     if (existCar && !existCar.userId) {
-      return this.prismaService.$transaction(async (tx) => {
-        const updatedVehicle = await tx.vehicle.update({
-          where: {
-            id: existCar.id,
-          },
-          data: {
-            userId,
-          },
-        });
-
-        const systemCategory = await tx.category.findUnique({
-          where: {
-            slug: SYSTEM_CATEGORIES.ownership_transfer.slug,
-          },
-        });
-
-        await tx.serviceLog.create({
-          data: {
-            mileage: updatedVehicle.currentMileage,
-            description: 'Vehicle ownership',
-            categoryId: systemCategory?.id || null,
-            vehicleId: updatedVehicle.id,
-            isMileageValid: true,
-          },
-        });
-
-        return updatedVehicle;
-      });
+      return await this.link(dto.vin, userId);
     }
 
     const vehicleStatus = await this.verifyVehicle(
@@ -327,6 +300,56 @@ export class VehiclesService {
       data: {
         image: null,
       },
+    });
+  }
+
+  async checkIfVehicleHasOwner(vin: string) {
+    const vehicle = await this.prismaService.vehicle.findUnique({
+      where: {
+        vin,
+      },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    return {
+      id: vehicle.id,
+      hasOwner: vehicle.userId !== null,
+    };
+  }
+
+  async link(id: string, userId: string) {
+    const existVehicle = await this.findById(id);
+
+    return this.prismaService.$transaction(async (tx) => {
+      const updatedVehicle = await tx.vehicle.update({
+        where: {
+          id: existVehicle.id,
+        },
+        data: {
+          userId,
+        },
+      });
+
+      const systemCategory = await tx.category.findUnique({
+        where: {
+          slug: SYSTEM_CATEGORIES.ownership_transfer.slug,
+        },
+      });
+
+      await tx.serviceLog.create({
+        data: {
+          mileage: updatedVehicle.currentMileage,
+          description: 'Vehicle ownership',
+          categoryId: systemCategory?.id || null,
+          vehicleId: updatedVehicle.id,
+          isMileageValid: true,
+        },
+      });
+
+      return updatedVehicle;
     });
   }
 }

@@ -8,6 +8,7 @@ import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
 import { ServiceLogItemDto } from './dto/service-log-item.dto';
 import { FilesService } from '../files/files.service';
+import { UpdateMediaDto } from './dto/update-media.dto';
 
 @Injectable()
 export class ServiceLogsService {
@@ -216,8 +217,10 @@ export class ServiceLogsService {
   async updateMedia(
     id: string,
     files: Express.Multer.File[] = [],
-    idsToDelete: string[] = [],
+    dto: UpdateMediaDto,
   ) {
+    const { idsToDelete } = dto;
+
     const mediaToDelete = await this.prismaService.serviceLogMedia.findMany({
       where: {
         id: { in: idsToDelete },

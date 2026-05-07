@@ -75,6 +75,12 @@ export class VehiclesController {
     return this.vehiclesService.update(id, dto);
   }
 
+  @Delete(':id/remove-image')
+  @UseGuards(JwtAuthGuard)
+  async removeImage(@Param('id') id: string) {
+    return this.vehiclesService.removeImage(id);
+  }
+
   @Patch(':id/unlink/:userId')
   @UseGuards(JwtAuthGuard)
   async unlinkVehicle(
@@ -84,9 +90,15 @@ export class VehiclesController {
     return this.vehiclesService.unlink(id, userId);
   }
 
-  @Delete(':id/remove-image')
+  @Patch(':id/link/:userId')
   @UseGuards(JwtAuthGuard)
-  async removeImage(@Param('id') id: string) {
-    return this.vehiclesService.removeImage(id);
+  async linkVehicle(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.vehiclesService.link(id, userId);
+  }
+
+  @Get('/has-owner/:vin')
+  @UseGuards(JwtAuthGuard)
+  async checkIfVehicleHasOwner(@Param('vin') vin: string) {
+    return this.vehiclesService.checkIfVehicleHasOwner(vin);
   }
 }

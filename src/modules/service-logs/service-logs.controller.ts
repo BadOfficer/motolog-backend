@@ -16,6 +16,7 @@ import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { UpdateMediaDto } from './dto/update-media.dto';
 
 @Controller('service-logs')
 export class ServiceLogsController {
@@ -33,17 +34,15 @@ export class ServiceLogsController {
     return this.serviceLogsService.correct(id, dto);
   }
 
-  @Patch(':id/update-media')
+  @Patch(':id/update-media/:ownerId')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('media'))
   async updateLogMedia(
     @Param('id') id: string,
-    @Query('idsToDelete') idsToDelete: string,
+    @Body() dto: UpdateMediaDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    const deleteIds = idsToDelete !== undefined ? idsToDelete.split(',') : [];
-
-    return this.serviceLogsService.updateMedia(id, files, deleteIds);
+    return this.serviceLogsService.updateMedia(id, files, dto);
   }
 
   @Get('/for-vehicle/:vehicleId')
