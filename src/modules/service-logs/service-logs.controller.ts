@@ -2,8 +2,11 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   Patch,
   Post,
   Query,
@@ -40,7 +43,20 @@ export class ServiceLogsController {
   async updateLogMedia(
     @Param('id') id: string,
     @Body() dto: UpdateMediaDto,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 10 * 1024 * 1024, // 10 MB
+          }),
+          new FileTypeValidator({
+            fileType: /^(image\/jpeg|image\/png|image\/webp|application\/pdf)$/,
+          }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    files: Express.Multer.File[],
   ) {
     return this.serviceLogsService.updateMedia(id, files, dto);
   }

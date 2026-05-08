@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { FilesService } from './files.service';
-import { FilesLocalService } from './files-local.service';
+import { FilesS3Service } from './files-s3.service';
 
 @Module({
   providers: [
     {
       provide: FilesService,
-      useClass: FilesLocalService,
+      useClass: FilesS3Service,
     },
   ],
   exports: [FilesService],
