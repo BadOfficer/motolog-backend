@@ -68,11 +68,18 @@ export class CategoriesService {
   async update(id: string, categoryDto: UpdateCategoryDto) {
     await this.canChange(id);
 
+    const existCategory = await this.findById(id);
+
+    const slug = getSlug(categoryDto.title || existCategory.title);
+
     return this.prismaService.category.update({
       where: {
         id,
       },
-      data: categoryDto,
+      data: {
+        ...categoryDto,
+        slug,
+      },
     });
   }
 
@@ -84,5 +91,9 @@ export class CategoriesService {
         id,
       },
     });
+  }
+
+  async getAll() {
+    return this.prismaService.category.findMany();
   }
 }

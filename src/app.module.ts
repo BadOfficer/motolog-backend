@@ -7,6 +7,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ServiceLogsModule } from './modules/service-logs/service-logs.module';
 import { VehiclesMakesModule } from './modules/vehicles-makes/vehicles-makes.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { VehiclesModelsModule } from './modules/vehicles-models/vehicles-models.module';
 import { GlobalHttpModule } from './modules/http/http.module';
 import { Express } from 'express';
@@ -30,6 +31,7 @@ import { join } from 'path';
     VehiclesModule,
     CategoriesModule,
     ServiceLogsModule,
+    AnalyticsModule,
     VehiclesMakesModule,
     VehiclesModelsModule,
   ],

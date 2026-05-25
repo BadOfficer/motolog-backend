@@ -18,6 +18,7 @@ const safeUserSelect = {
   firstName: true,
   lastName: true,
   role: true,
+  createdAt: true,
 } as const;
 
 @Injectable()
@@ -81,7 +82,7 @@ export class UsersService {
         },
       });
 
-      if (existUserByEmail) {
+      if (existUserByEmail && existUserByEmail.id !== id) {
         throw new BadRequestException(
           `User with email - ${dto.email} is exist`,
         );

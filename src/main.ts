@@ -11,6 +11,14 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.enableCors({
+    origin: 'http://localhost:3000', // Allow specific domain
+    methods: 'GET,POST,PUT,DELETE,PATCH', // Allow HTTP methods
+    credentials: true, // Allow cookies to be sent
+    allowedHeaders: 'Content-Type, Authorization',
+  });
+
   const port = process.env.PORT ?? 3000;
 
   console.log(port);

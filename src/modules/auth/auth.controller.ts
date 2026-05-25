@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -16,6 +17,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthUser } from './interfaces/auth-user.interface';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import type { GoogleUser } from './interfaces/google-user.interface';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -54,7 +56,18 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  googleAuthCallback(@CurrentUser() googleUser: GoogleUser) {
-    return this.authService.signInWithGoogle(googleUser);
+  async googleAuthCallback(
+    @CurrentUser() googleUser: GoogleUser,
+    @Res() res: Response,
+  ) {
+    const tokens = await this.authService.signInWithGoogle(googleUser);
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const redirectUrl =
+      `${frontendUrl}/auth/callback` +
+      `?accessToken=${encodeURIComponent(tokens.accessToken)}` +
+      `&refreshToken=${encodeURIComponent(tokens.refreshToken)}`;
+
+    return res.redirect(redirectUrl);
   }
 }

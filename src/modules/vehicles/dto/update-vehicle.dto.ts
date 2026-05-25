@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min, IsBoolean } from 'class-validator';
 import { IsVin } from '../decorators/IsVIN.decorator';
 
 export class UpdateVehicleDto {
@@ -44,4 +44,8 @@ export class UpdateVehicleDto {
   @IsString({ message: 'Secondary fuel type must be a string' })
   @IsOptional()
   secondaryFuel?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'isPublic must be a boolean' })
+  isPublic?: boolean;
 }

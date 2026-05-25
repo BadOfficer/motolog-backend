@@ -19,7 +19,6 @@ import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { UpdateMediaDto } from './dto/update-media.dto';
 
 @Controller('service-logs')
 export class ServiceLogsController {
@@ -27,27 +26,14 @@ export class ServiceLogsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async createLog(@Body() dto: CreateServiceLogDto) {
-    return this.serviceLogsService.create(dto);
-  }
-
-  @Patch('/:id/correct')
-  @UseGuards(JwtAuthGuard)
-  async correctLog(@Param('id') id: string, @Body() dto: CorrectServiceLogDto) {
-    return this.serviceLogsService.correct(id, dto);
-  }
-
-  @Patch(':id/update-media/:ownerId')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('media'))
-  async updateLogMedia(
-    @Param('id') id: string,
-    @Body() dto: UpdateMediaDto,
+  async createLog(
+    @Body() dto: CreateServiceLogDto,
     @UploadedFiles(
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({
-            maxSize: 10 * 1024 * 1024, // 10 MB
+            maxSize: 10 * 1024 * 1024,
           }),
           new FileTypeValidator({
             fileType: /^(image\/jpeg|image\/png|image\/webp|application\/pdf)$/,
@@ -58,7 +44,31 @@ export class ServiceLogsController {
     )
     files: Express.Multer.File[],
   ) {
-    return this.serviceLogsService.updateMedia(id, files, dto);
+    return this.serviceLogsService.create(dto, files);
+  }
+
+  @Patch('/:id/correct')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FilesInterceptor('media'))
+  async correctLog(
+    @Param('id') id: string,
+    @Body() dto: CorrectServiceLogDto,
+    @UploadedFiles(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 10 * 1024 * 1024,
+          }),
+          new FileTypeValidator({
+            fileType: /^(image\/jpeg|image\/png|image\/webp|application\/pdf)$/,
+          }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    files: Express.Multer.File[],
+  ) {
+    return this.serviceLogsService.correct(id, dto, files);
   }
 
   @Get('/for-vehicle/:vehicleId')
@@ -71,5 +81,20 @@ export class ServiceLogsController {
   @UseGuards(JwtAuthGuard)
   async deleteLog(@Param('id') id: string) {
     return this.serviceLogsService.delete(id);
+  }
+
+  @Get('for-vehicle/:vehicleId')
+  async getByBehicleId(
+    @Param('vehicleId') vehicleId: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    return this.serviceLogsService.findByVehicleId(vehicleId, +page, +limit);
+  }
+
+  @Get('/:id')
+  @UseGuards(JwtAuthGuard)
+  async getById(@Param('id') id: string) {
+    return this.serviceLogsService.findById(id);
   }
 }

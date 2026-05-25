@@ -8,7 +8,8 @@ import { CreateServiceLogDto } from './dto/create-service-log.dto';
 import { CorrectServiceLogDto } from './dto/correct-service-log.dto';
 import { ServiceLogItemDto } from './dto/service-log-item.dto';
 import { FilesService } from '../files/files.service';
-import { UpdateMediaDto } from './dto/update-media.dto';
+import { PaginatedResponse } from 'src/interfaces/PaginatedResponse.interface';
+import { ServiceLog } from 'src/generated/prisma/client';
 
 @Injectable()
 export class ServiceLogsService {
@@ -30,14 +31,40 @@ export class ServiceLogsService {
     vehicleId: string,
     newMileage: number,
     date: Date,
+    excludeRecordId?: string,
   ) {
+    const dayStart = new Date(date);
+    dayStart.setUTCHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(date);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+
+    const sameDayRecords = await this.prismaService.serviceLog.findMany({
+      where: {
+        vehicleId,
+        status: 'ACTIVE',
+        date: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
+        ...(excludeRecordId ? { id: { not: excludeRecordId } } : {}),
+      },
+    });
+
+    if (sameDayRecords.some((r) => r.mileage !== newMileage)) {
+      throw new BadRequestException(
+        'Cannot add a record with a different mileage on the same date',
+      );
+    }
+
     const prevRecord = await this.prismaService.serviceLog.findFirst({
       where: {
         vehicleId,
         status: 'ACTIVE',
         date: {
-          lt: date,
+          lt: dayStart,
         },
+        ...(excludeRecordId ? { id: { not: excludeRecordId } } : {}),
       },
       orderBy: {
         date: 'desc',
@@ -49,8 +76,9 @@ export class ServiceLogsService {
         vehicleId,
         status: 'ACTIVE',
         date: {
-          gt: date,
+          gt: dayEnd,
         },
+        ...(excludeRecordId ? { id: { not: excludeRecordId } } : {}),
       },
       orderBy: {
         date: 'asc',
@@ -59,13 +87,19 @@ export class ServiceLogsService {
 
     const warnings: string[] = [];
 
-    if (prevRecord && prevRecord.mileage >= newMileage) {
+    if (prevRecord && prevRecord.mileage > newMileage) {
       warnings.push(
         `Mileage is lower than previous record: ${prevRecord.mileage}`,
       );
     }
 
-    if (nextRecord && nextRecord.mileage <= newMileage) {
+    console.log(nextRecord?.id);
+
+    console.log(nextRecord?.mileage);
+    console.log(newMileage);
+
+    if (nextRecord && nextRecord.mileage < newMileage) {
+      console.log('Yes');
       warnings.push(
         `Mileage is higher than next record: ${nextRecord.mileage}`,
       );
@@ -84,6 +118,16 @@ export class ServiceLogsService {
       where: {
         id,
       },
+      include: {
+        items: true,
+        category: {
+          select: {
+            title: true,
+            isSystem: true,
+          },
+        },
+        media: true,
+      },
     });
 
     if (!existLog) {
@@ -93,7 +137,7 @@ export class ServiceLogsService {
     return existLog;
   }
 
-  async create(dto: CreateServiceLogDto) {
+  async create(dto: CreateServiceLogDto, files: Express.Multer.File[] = []) {
     const { isValid, warnings } = await this.validateRecordMileage(
       dto.vehicleId,
       dto.mileage,
@@ -103,50 +147,75 @@ export class ServiceLogsService {
     const items = dto?.items || [];
 
     const total = this.calculateTotal(items, dto.subTotal);
+    const savedFiles =
+      files.length > 0
+        ? await this.filesService.saveFiles(files, 'service-logs')
+        : [];
 
-    return this.prismaService.$transaction(async (tx) => {
-      const newLog = await tx.serviceLog.create({
-        data: {
-          ...dto,
-          total,
-          date: dto.date,
-          mileageWarnings: warnings,
-          isMileageValid: isValid,
-          items: {
-            createMany: {
-              data: items,
+    try {
+      return await this.prismaService.$transaction(async (tx) => {
+        const newLog = await tx.serviceLog.create({
+          data: {
+            ...dto,
+            total,
+            date: dto.date,
+            mileageWarnings: warnings,
+            isMileageValid: isValid,
+            items: {
+              createMany: {
+                data: items,
+              },
             },
           },
-        },
-      });
+        });
 
-      const vehicle = await this.prismaService.vehicle.findUnique({
-        where: {
-          id: dto.vehicleId,
-        },
-      });
+        if (savedFiles.length > 0) {
+          await tx.serviceLogMedia.createMany({
+            data: savedFiles.map((url) => ({
+              serviceLogId: newLog.id,
+              url,
+            })),
+          });
+        }
 
-      if (!vehicle) {
-        throw new NotFoundException(`Vehicle not found`);
-      }
-
-      if (newLog.mileage > vehicle.currentMileage) {
-        await this.prismaService.vehicle.update({
+        const vehicle = await tx.vehicle.findUnique({
           where: {
             id: dto.vehicleId,
           },
-          data: {
-            currentMileage: newLog.mileage,
-            lastMileageUpdate: new Date(),
-          },
         });
+
+        if (!vehicle) {
+          throw new NotFoundException(`Vehicle not found`);
+        }
+
+        if (newLog.mileage > vehicle.currentMileage) {
+          await tx.vehicle.update({
+            where: {
+              id: dto.vehicleId,
+            },
+            data: {
+              currentMileage: newLog.mileage,
+              lastMileageUpdate: new Date(),
+            },
+          });
+        }
+
+        return newLog;
+      });
+    } catch (error) {
+      if (savedFiles.length > 0) {
+        await this.filesService.removeFiles(savedFiles);
       }
 
-      return newLog;
-    });
+      throw error;
+    }
   }
 
-  async correct(id: string, dto: CorrectServiceLogDto) {
+  async correct(
+    id: string,
+    dto: CorrectServiceLogDto,
+    files: Express.Multer.File[] = [],
+  ) {
     const log = await this.findById(id);
 
     switch (log.status) {
@@ -162,105 +231,92 @@ export class ServiceLogsService {
       log.vehicleId,
       dto.mileage,
       dto.date,
+      id,
     );
+    const { idsToDelete = [], correctReason: _correctReason, ...payload } = dto;
+    const inheritedMediaIds = new Set(log.media.map((media) => media.id));
 
-    const items = dto?.items ?? [];
+    if (idsToDelete.some((mediaId) => !inheritedMediaIds.has(mediaId))) {
+      throw new BadRequestException(
+        'Some media idsToDelete are not attached to corrected record',
+      );
+    }
+
+    const items =
+      dto.items !== undefined
+        ? dto.items
+        : log.items.map((item) => ({
+            name: item.name,
+            brand: item.brand ?? undefined,
+            description: item.description ?? undefined,
+            partNumber: item.partNumber ?? undefined,
+            unitPrice: Number(item.unitPrice),
+            quantity: item.quantity,
+          }));
 
     const total = this.calculateTotal(items, dto.subTotal);
-
-    return this.prismaService.$transaction(async (tx) => {
-      const newLog = await tx.serviceLog.create({
-        data: {
-          ...dto,
-          correctReason: undefined,
-          vehicleId: log.vehicleId,
-          total,
-          isMileageValid: isValid,
-          mileageWarnings: warnings,
-          date: dto.date,
-          status: 'ACTIVE',
-          items: {
-            createMany: {
-              data: items,
-            },
-          },
-        },
-      });
-
-      await tx.serviceLog.update({
-        where: {
-          id: id,
-        },
-        data: {
-          correctedLogId: newLog.id,
-          status: 'CORRECTED',
-          correctReason: dto.correctReason,
-        },
-      });
-
-      if (!nextRecord) {
-        await tx.vehicle.update({
-          where: {
-            id: log.vehicleId,
-          },
-          data: {
-            currentMileage: dto.mileage,
-            lastMileageUpdate: new Date(),
-          },
-        });
-      }
-
-      return newLog;
-    });
-  }
-
-  async updateMedia(
-    id: string,
-    files: Express.Multer.File[] = [],
-    dto: UpdateMediaDto,
-  ) {
-    const { idsToDelete } = dto;
-
-    const mediaToDelete = await this.prismaService.serviceLogMedia.findMany({
-      where: {
-        id: { in: idsToDelete },
-        serviceLogId: id,
-      },
-    });
-
+    const inheritedMediaUrls = log.media
+      .filter((media) => !idsToDelete.includes(media.id))
+      .map((media) => media.url);
     const savedFiles =
       files.length > 0
         ? await this.filesService.saveFiles(files, 'service-logs')
         : [];
 
     try {
-      const urlsToDelete = await this.prismaService.$transaction(async (tx) => {
-        if (idsToDelete.length > 0) {
-          await tx.serviceLogMedia.deleteMany({
-            where: {
-              id: { in: idsToDelete },
-              serviceLogId: id,
+      return await this.prismaService.$transaction(async (tx) => {
+        const newLog = await tx.serviceLog.create({
+          data: {
+            ...payload,
+            vehicleId: log.vehicleId,
+            total,
+            isMileageValid: isValid,
+            mileageWarnings: warnings,
+            date: dto.date,
+            status: 'ACTIVE',
+            items: {
+              createMany: {
+                data: items,
+              },
             },
-          });
-        }
+          },
+        });
 
-        if (savedFiles.length > 0) {
+        const nextMediaUrls = [...inheritedMediaUrls, ...savedFiles];
+
+        if (nextMediaUrls.length > 0) {
           await tx.serviceLogMedia.createMany({
-            data: savedFiles.map((url) => ({
-              serviceLogId: id,
+            data: nextMediaUrls.map((url) => ({
+              serviceLogId: newLog.id,
               url,
             })),
           });
         }
 
-        return mediaToDelete.map((item) => item.url);
-      });
+        await tx.serviceLog.update({
+          where: {
+            id: id,
+          },
+          data: {
+            correctedLogId: newLog.id,
+            status: 'CORRECTED',
+            correctReason: dto.correctReason,
+          },
+        });
 
-      await this.filesService.removeFiles(urlsToDelete);
+        if (!nextRecord) {
+          await tx.vehicle.update({
+            where: {
+              id: log.vehicleId,
+            },
+            data: {
+              currentMileage: dto.mileage,
+              lastMileageUpdate: new Date(),
+            },
+          });
+        }
 
-      return this.prismaService.serviceLogMedia.findMany({
-        where: { serviceLogId: id },
-        orderBy: { createdAt: 'desc' },
+        return newLog;
       });
     } catch (error) {
       if (savedFiles.length > 0) {
@@ -276,16 +332,62 @@ export class ServiceLogsService {
       where: {
         vehicleId,
       },
+      orderBy: {
+        date: 'desc',
+      },
+      include: {
+        items: true,
+        category: true,
+      },
     });
   }
 
   async delete(id: string) {
-    await this.findById(id);
+    const log = await this.findById(id);
 
-    return this.prismaService.serviceLog.delete({
+    if (log.status === 'DELETED') {
+      throw new BadRequestException('Service log is already deleted');
+    }
+
+    return this.prismaService.serviceLog.update({
       where: {
         id,
       },
+      data: {
+        status: 'DELETED',
+      },
     });
+  }
+
+  async findByVehicleId(
+    vehicleId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedResponse<ServiceLog>> {
+    const offset = (page - 1) * limit;
+
+    const [data, total] = await this.prismaService.$transaction([
+      this.prismaService.serviceLog.findMany({
+        skip: offset,
+        take: limit,
+        orderBy: {
+          date: 'desc',
+        },
+        where: {
+          vehicleId,
+        },
+      }),
+
+      this.prismaService.serviceLog.count({
+        where: {
+          vehicleId,
+        },
+      }),
+    ]);
+
+    return {
+      data,
+      totalElements: total,
+    };
   }
 }

@@ -29,6 +29,12 @@ export class VehiclesMakesController {
     return this.vehiclesMakesService.getAll(+page, +limit, query);
   }
 
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async getById(@Param('id') id: string) {
+    return this.vehiclesMakesService.getById(id);
+  }
+
   @Post()
   @Roles(Role.ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -19,12 +19,47 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Role } from 'src/generated/prisma/enums';
 
 @Controller('vehicles')
 export class VehiclesController {
   constructor(private readonly vehiclesService: VehiclesService) {}
 
-  @Get('/decode-vin')
+  @Get('/admin/all')
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async getAllForAdmin(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+    @Query('query') query: string = '',
+  ) {
+    return this.vehiclesService.getAllForAdmin(+page, +limit, query);
+  }
+
+  @Patch('/admin/:id/verify')
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async verifyByAdmin(@Param('id') id: string) {
+    return this.vehiclesService.verifyByAdmin(id);
+  }
+
+  @Patch('/admin/:id/unlink')
+  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async unlinkByAdmin(@Param('id') id: string) {
+    return this.vehiclesService.unlinkByAdmin(id);
+  }
+
+  @Get('/my')
+  @UseGuards(JwtAuthGuard)
+  async getMyVehicles(@CurrentUser() user: AuthUser) {
+    return this.vehiclesService.getByUserId(user.id);
+  }
+
+  @Post('/decode-vin')
   @UseGuards(JwtAuthGuard)
   async decodeVin(@Body() vinBody: DecodeVinDto) {
     return this.vehiclesService.decodeVin(vinBody.vin);
@@ -39,11 +74,12 @@ export class VehiclesController {
     return this.vehiclesService.createVehicle(createVehicleDto, user.id);
   }
 
-  @Get('/:id')
+  @Get('/shared/:id')
   @UseGuards(JwtAuthGuard)
-  async getVehicleById(@Param('id') id: string) {
-    return this.vehiclesService.findById(id);
+  async getSharedVehicle(@Param('id') id: string) {
+    return this.vehiclesService.getSharedVehicle(id);
   }
+
 
   @Patch(':id/update-mileage')
   @UseGuards(JwtAuthGuard)
@@ -100,5 +136,11 @@ export class VehiclesController {
   @UseGuards(JwtAuthGuard)
   async checkIfVehicleHasOwner(@Param('vin') vin: string) {
     return this.vehiclesService.checkIfVehicleHasOwner(vin);
+  }
+
+  @Get('/:id')
+  @UseGuards(JwtAuthGuard)
+  async getVehicleById(@Param('id') id: string) {
+    return this.vehiclesService.findById(id);
   }
 }

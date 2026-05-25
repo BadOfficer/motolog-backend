@@ -30,7 +30,8 @@ model User {
   firstName String
   lastName  String
   accounts  OAuthAccount[]
-  vehicles  Vehicle[]
+  vehicles  Vehicle[] @relation("VehicleOwner")
+  previousVehicles Vehicle[] @relation("VehiclePreviousOwner")
   avatar    String?
   role      Role?         @default(USER)
 
@@ -105,16 +106,21 @@ model Vehicle {
   currentMileage  Int
   primaryFuel     String
 
+  isPublic        Boolean? @default(true)
+
   secondaryFuel   String?
   displacement    String?
   licensePlate    String? @unique
   
-  user            User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user            User? @relation("VehicleOwner", fields: [userId], references: [id], onDelete: SetNull)
   userId          String?
   serviceLogs            ServiceLog[]
   lastMileageUpdate DateTime   @default(now())
   image             String?
   vehicleStatus   VehicleStatus
+
+  previousOwner      User?    @relation("VehiclePreviousOwner", fields: [previousOwnerId], references: [id], onDelete: SetNull)
+  previousOwnerId    String?
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsDate,
@@ -10,7 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ServiceLogItemDto } from './service-log-item.dto';
-import { Type } from 'class-transformer';
+import { Type, plainToInstance } from 'class-transformer';
 
 export class CreateServiceLogDto {
   @IsString({ message: 'Category Id must be a string' })
@@ -26,7 +27,7 @@ export class CreateServiceLogDto {
   description!: string;
 
   @IsInt()
-  @IsNotEmpty({ message: 'Description is required' })
+  @IsNotEmpty({ message: 'Mileage is required' })
   @Type(() => Number)
   mileage!: number;
 
@@ -38,6 +39,14 @@ export class CreateServiceLogDto {
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
+  @Transform(({ value }) => {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      return Array.isArray(parsed) ? plainToInstance(ServiceLogItemDto, parsed) : parsed;
+    } catch(e) {
+      return value;
+    }
+  })
   @Type(() => ServiceLogItemDto)
   items?: ServiceLogItemDto[];
 

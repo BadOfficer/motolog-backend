@@ -1,4 +1,5 @@
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
+import { Type, plainToInstance } from 'class-transformer';
 import {
   IsArray,
   IsDate,
@@ -6,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxDate,
   Min,
   ValidateNested,
@@ -22,7 +24,7 @@ export class CorrectServiceLogDto {
   description!: string;
 
   @IsInt()
-  @IsNotEmpty({ message: 'Description is required' })
+  @IsNotEmpty({ message: 'Mileage is required' })
   @Type(() => Number)
   mileage!: number;
 
@@ -45,6 +47,19 @@ export class CorrectServiceLogDto {
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
+  @Transform(({ value }) => {
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      return Array.isArray(parsed) ? plainToInstance(ServiceLogItemDto, parsed) : parsed;
+    } catch(e) {
+      return value;
+    }
+  })
   @Type(() => ServiceLogItemDto)
   items?: ServiceLogItemDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  idsToDelete?: string[];
 }

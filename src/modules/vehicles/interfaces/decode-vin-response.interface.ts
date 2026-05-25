@@ -9,4 +9,6 @@ export type DecodeVinItem = {
 export interface DecodeVinResponse extends DecodeVinItem {
   vin: string;
   success: boolean;
+  makeId?: string | null;
+  modelId?: string | null;
 }

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   Patch,
   Post,
@@ -18,6 +19,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  async getCategories() {
+    return this.categoriesService.getAll();
+  }
 
   @Post()
   @Roles(Role.ADMIN)

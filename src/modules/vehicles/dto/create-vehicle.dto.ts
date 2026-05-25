@@ -41,7 +41,7 @@ export class CreateVehicleDto {
   currentMileage!: number;
 
   @IsString({ message: 'Displacement must be an string' })
-  @IsNotEmpty({ message: 'Displacement is required' })
+  @IsOptional()
   displacement?: string;
 
   @IsString({ message: 'License plate must be a string' })

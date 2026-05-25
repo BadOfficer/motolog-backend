@@ -42,7 +42,7 @@ async function main() {
     },
     create: {
       email: 'admin@admin.com',
-      password: 'Admin1234',
+      password: hashedAdminPassword,
       role: Role.ADMIN,
       firstName: 'Taras',
       lastName: 'Bondarenko',

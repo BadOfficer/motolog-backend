@@ -20,6 +20,8 @@ import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { isImage } from 'src/utils/file-validation';
 import { FilesService } from '../files/files.service';
 import { VehicleStatus } from 'src/generated/prisma/enums';
+import { PaginatedResponse } from 'src/interfaces/PaginatedResponse.interface';
+import { ServiceLog } from 'src/generated/prisma/client';
 
 @Injectable()
 export class VehiclesService {
@@ -30,6 +32,26 @@ export class VehiclesService {
     private readonly vehicleModelsService: VehiclesModelsService,
     private readonly filesService: FilesService,
   ) {}
+
+  async getByUserId(userId: string) {
+    return this.prismaService.vehicle.findMany({
+      where: { userId },
+      include: {
+        make: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        model: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
 
   async decodeVin(vin: string): Promise<DecodeVinResponse> {
     const initialResult: DecodeVinItem = {
@@ -49,10 +71,40 @@ export class VehiclesService {
 
       const parsedData = parseVinResults(response.data, initialResult);
 
+      let makeId: string | null = null;
+      let modelId: string | null = null;
+
+      if (parsedData.make) {
+        const make = await this.prismaService.make.findFirst({
+          where: { title: { equals: parsedData.make, mode: 'insensitive' } },
+        });
+        if (make) {
+          makeId = make.id;
+
+          if (!make.isSynced) {
+            await this.vehicleModelsService.getModelsByMakeId(make.id, 1, 1);
+          }
+
+          if (parsedData.model) {
+            const model = await this.prismaService.model.findFirst({
+              where: {
+                makeId: make.id,
+                name: { equals: parsedData.model, mode: 'insensitive' },
+              },
+            });
+            if (model) {
+              modelId = model.id;
+            }
+          }
+        }
+      }
+
       return {
         ...parsedData,
         vin,
         success: true,
+        makeId,
+        modelId,
       };
     } catch (e) {
       console.log(e);
@@ -125,13 +177,17 @@ export class VehiclesService {
     });
 
     if (existCar && existCar.userId) {
-      throw new BadRequestException(
-        `Car with vin - ${dto.vin} or with plates - ${dto.licensePlate} is exist`,
-      );
+      if (existCar.licensePlate) {
+        throw new BadRequestException(
+          `Car with vin - ${dto.vin} or with plates - ${dto.licensePlate} is exist`,
+        );
+      }
+
+      throw new BadRequestException(`Car with vin - ${dto.vin} is exist`);
     }
 
     if (existCar && !existCar.userId) {
-      return await this.link(dto.vin, userId);
+      return await this.link(existCar.id, userId);
     }
 
     const vehicleStatus = await this.verifyVehicle(
@@ -174,7 +230,7 @@ export class VehiclesService {
         },
       });
 
-      return createdVehicle.id;
+      return createdVehicle;
     });
   }
 
@@ -190,20 +246,62 @@ export class VehiclesService {
       throw new NotFoundException('Vehicle not found');
     }
 
-    return this.prismaService.vehicle.update({
+    await this.prismaService.vehicle.update({
       where: {
         id,
         userId,
       },
       data: {
         userId: null,
+        previousOwnerId: userId,
       },
     });
+    return this.findById(id);
   }
 
   async update(id: string, dto: UpdateVehicleDto) {
     const vehicle = await this.findById(id);
     let vehicleStatus = vehicle.vehicleStatus;
+    const nextVin = dto.vin ?? vehicle.vin;
+    const nextLicensePlate =
+      dto.licensePlate !== undefined ? dto.licensePlate : vehicle.licensePlate;
+
+    if (dto.vin !== undefined || dto.licensePlate !== undefined) {
+      const duplicateVehicle = await this.prismaService.vehicle.findFirst({
+        where: {
+          id: {
+            not: vehicle.id,
+          },
+          OR: [
+            {
+              vin: nextVin,
+            },
+            ...(nextLicensePlate
+              ? [
+                  {
+                    licensePlate: nextLicensePlate,
+                  },
+                ]
+              : []),
+          ],
+        },
+      });
+
+      if (duplicateVehicle) {
+        if (duplicateVehicle.vin === nextVin) {
+          throw new BadRequestException(`Car with vin - ${nextVin} is exist`);
+        }
+
+        if (
+          nextLicensePlate &&
+          duplicateVehicle.licensePlate === nextLicensePlate
+        ) {
+          throw new BadRequestException(
+            `Car with plates - ${nextLicensePlate} is exist`,
+          );
+        }
+      }
+    }
 
     const checkMake = dto.makeId && dto.makeId !== vehicle.makeId;
     const checkModel = dto.modelId && dto.modelId !== vehicle.modelId;
@@ -222,7 +320,7 @@ export class VehiclesService {
       );
     }
 
-    return this.prismaService.vehicle.update({
+    await this.prismaService.vehicle.update({
       where: {
         id: vehicle.id,
       },
@@ -233,6 +331,7 @@ export class VehiclesService {
           dto.currentMileage !== undefined ? new Date() : undefined,
       },
     });
+    return this.findById(id);
   }
 
   private validateImage(file: Express.Multer.File) {
@@ -293,7 +392,7 @@ export class VehiclesService {
 
     await this.filesService.removeFile(vehicle.image);
 
-    return this.prismaService.vehicle.update({
+    await this.prismaService.vehicle.update({
       where: {
         id,
       },
@@ -301,6 +400,7 @@ export class VehiclesService {
         image: null,
       },
     });
+    return this.findById(id);
   }
 
   async checkIfVehicleHasOwner(vin: string) {
@@ -339,17 +439,115 @@ export class VehiclesService {
         },
       });
 
-      await tx.serviceLog.create({
-        data: {
-          mileage: updatedVehicle.currentMileage,
-          description: 'Vehicle ownership',
-          categoryId: systemCategory?.id || null,
-          vehicleId: updatedVehicle.id,
-          isMileageValid: true,
-        },
-      });
+      if (existVehicle.previousOwnerId !== userId) {
+        await tx.serviceLog.create({
+          data: {
+            mileage: updatedVehicle.currentMileage,
+            description: 'Vehicle ownership',
+            categoryId: systemCategory?.id || null,
+            vehicleId: updatedVehicle.id,
+            isMileageValid: true,
+          },
+        });
+      }
 
       return updatedVehicle;
     });
   }
+
+
+  async getSharedVehicle(id: string) {
+    const vehicle = await this.prismaService.vehicle.findUnique({
+      where: { id },
+      include: {
+        make: true,
+        model: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+        serviceLogs: {
+          where: { status: 'ACTIVE' },
+          orderBy: { date: 'desc' },
+          include: {
+            category: true,
+            items: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle || vehicle.isPublic === false) {
+      throw new NotFoundException('Vehicle not found or is not public');
+    }
+
+    return vehicle;
+  }
+
+  async getAllForAdmin(page: number = 1, limit: number = 20, query: string = ''): Promise<PaginatedResponse<any>> {
+    const offset = (page - 1) * limit;
+
+    const where = query
+      ? {
+          OR: [
+            { vin: { contains: query, mode: 'insensitive' as const } },
+            { licensePlate: { contains: query, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const [data, total] = await this.prismaService.$transaction([
+      this.prismaService.vehicle.findMany({
+        where,
+        skip: offset,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          make: { select: { title: true } },
+          model: { select: { name: true } },
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      }),
+      this.prismaService.vehicle.count({ where }),
+    ]);
+
+    return {
+      data,
+      totalElements: total,
+    };
+  }
+
+  async verifyByAdmin(id: string) {
+    const vehicle = await this.findById(id);
+    
+    await this.prismaService.vehicle.update({
+      where: { id },
+      data: { vehicleStatus: VehicleStatus.VERIFIED },
+    });
+
+    return this.findById(id);
+  }
+
+  async unlinkByAdmin(id: string) {
+    const vehicle = await this.findById(id);
+    
+    if (!vehicle.userId) {
+      throw new BadRequestException('Vehicle has no owner to unlink');
+    }
+
+    await this.prismaService.vehicle.update({
+      where: { id },
+      data: {
+        userId: null,
+        previousOwnerId: vehicle.userId,
+      },
+    });
+
+    return this.findById(id);
+  }
 }
+
