@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min, IsBoolean } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min, IsBoolean, IsIn } from 'class-validator';
 import { IsVin } from '../decorators/IsVIN.decorator';
 
 export class UpdateVehicleDto {
@@ -48,4 +48,9 @@ export class UpdateVehicleDto {
   @IsOptional()
   @IsBoolean({ message: 'isPublic must be a boolean' })
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['KM', 'MI'])
+  distanceUnit?: 'KM' | 'MI';
 }

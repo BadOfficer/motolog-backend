@@ -6,6 +6,7 @@ import {
   IsString,
   Max,
   Min,
+  IsIn,
 } from 'class-validator';
 import { IsVin } from '../decorators/IsVIN.decorator';
 
@@ -51,4 +52,9 @@ export class CreateVehicleDto {
   @IsString({ message: 'Secondary fuel type must be a string' })
   @IsOptional()
   secondaryFuel?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['KM', 'MI'])
+  distanceUnit?: 'KM' | 'MI';
 }

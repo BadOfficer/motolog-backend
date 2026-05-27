@@ -455,7 +455,6 @@ export class VehiclesService {
     });
   }
 
-
   async getSharedVehicle(id: string) {
     const vehicle = await this.prismaService.vehicle.findUnique({
       where: { id },
@@ -488,7 +487,11 @@ export class VehiclesService {
     return vehicle;
   }
 
-  async getAllForAdmin(page: number = 1, limit: number = 20, query: string = ''): Promise<PaginatedResponse<any>> {
+  async getAllForAdmin(
+    page: number = 1,
+    limit: number = 20,
+    query: string = '',
+  ): Promise<PaginatedResponse<any>> {
     const offset = (page - 1) * limit;
 
     const where = query
@@ -509,7 +512,9 @@ export class VehiclesService {
         include: {
           make: { select: { title: true } },
           model: { select: { name: true } },
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          user: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
         },
       }),
       this.prismaService.vehicle.count({ where }),
@@ -523,7 +528,7 @@ export class VehiclesService {
 
   async verifyByAdmin(id: string) {
     const vehicle = await this.findById(id);
-    
+
     await this.prismaService.vehicle.update({
       where: { id },
       data: { vehicleStatus: VehicleStatus.VERIFIED },
@@ -534,7 +539,7 @@ export class VehiclesService {
 
   async unlinkByAdmin(id: string) {
     const vehicle = await this.findById(id);
-    
+
     if (!vehicle.userId) {
       throw new BadRequestException('Vehicle has no owner to unlink');
     }
@@ -550,4 +555,3 @@ export class VehiclesService {
     return this.findById(id);
   }
 }
-

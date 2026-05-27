@@ -92,6 +92,11 @@ enum VehicleStatus {
   NEEDS_REVIEW
 }
 
+enum DistanceUnit {
+  KM
+  MI
+}
+
 model Vehicle {
   id              String @id @default(uuid())
   vin             String @unique
@@ -107,6 +112,7 @@ model Vehicle {
   primaryFuel     String
 
   isPublic        Boolean? @default(true)
+  distanceUnit    DistanceUnit @default(KM)
 
   secondaryFuel   String?
   displacement    String?
