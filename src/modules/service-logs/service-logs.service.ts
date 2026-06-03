@@ -93,13 +93,7 @@ export class ServiceLogsService {
       );
     }
 
-    console.log(nextRecord?.id);
-
-    console.log(nextRecord?.mileage);
-    console.log(newMileage);
-
     if (nextRecord && nextRecord.mileage < newMileage) {
-      console.log('Yes');
       warnings.push(
         `Mileage is higher than next record: ${nextRecord.mileage}`,
       );
