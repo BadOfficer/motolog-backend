@@ -1,98 +1,168 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MotoLog — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+REST API for **MotoLog**, a web application for tracking vehicle service history.
+Owners register their vehicles by VIN, log maintenance with parts and costs,
+track mileage, and share a vehicle's history publicly, for example when selling it.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Built as my bachelor's thesis project at Igor Sikorsky Kyiv Polytechnic Institute (2026).
 
-## Description
+**Frontend:** [dyploma-motolog-frontend](https://github.com/BadOfficer/dyploma-motolog-frontend)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
 
-## Project setup
+- **Framework:** NestJS 11, TypeScript
+- **Database:** PostgreSQL 16, Prisma ORM 7 (migrations, seeding)
+- **Auth:** JWT (access and refresh tokens), Google OAuth 2.0 (Passport), bcrypt
+- **Validation:** class-validator, class-transformer, global `ValidationPipe`
+- **File storage:** AWS S3
+- **External API:** NHTSA vPIC for VIN decoding, vehicle makes, and models
+- **Tooling:** Docker Compose, ESLint, Prettier
 
-```bash
-$ npm install
+## Features
+
+- **Authentication:** email/password sign-up and sign-in, Google OAuth, token refresh
+- **Role-based access:** `USER` and `ADMIN` roles enforced with custom guards and decorators
+- **Vehicles:** VIN decoding, custom `@IsVIN()` validator, mileage tracking, images,
+  linking and unlinking owners with previous-owner history, public sharing
+- **Service logs:** maintenance records with line items (parts, prices, quantities),
+  categories, photos, and mileage validation with warnings
+- **Audit trail:** logs are never edited in place. A correction creates a new log and
+  marks the original as `CORRECTED`; deletion is a soft delete
+- **Analytics:** mileage history and spending summary per vehicle, admin statistics
+- **Admin API:** verify vehicles, manage users, categories, makes, and models
+
+## Architecture
+
+The app follows the NestJS modular architecture: each domain is a module with its own
+controller, service, and DTOs, wired together through dependency injection.
+
+```
+src/
+├── config/              # JWT configuration
+├── modules/
+│   ├── auth/            # JWT and Google strategies, guards, role decorators
+│   ├── users/
+│   ├── vehicles/        # VIN decoding, ownership, sharing
+│   ├── vehicles-makes/
+│   ├── vehicles-models/
+│   ├── service-logs/    # logs, items, corrections
+│   ├── categories/
+│   ├── analytics/
+│   ├── files/           # storage abstraction
+│   └── http/            # global HTTP client (timeouts, redirects)
+├── prisma/              # PrismaService
+└── utils/, helpers/, constants/
 ```
 
-## Compile and run the project
+File storage is defined as an abstract `FilesService`. The files module binds it to
+`FilesS3Service` through DI, so the storage backend can be swapped without changing
+the services that use it.
+
+## Database
+
+![Entity relationship diagram](prisma/ERD.svg)
+
+Main entities: `User`, `OAuthAccount`, `Vehicle`, `Make`, `Model`, `ServiceLog`,
+`ServiceLogItem`, `ServiceLogMedia`, `Category`.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- Docker (for PostgreSQL)
+- AWS S3 bucket (for image uploads)
+- Google OAuth credentials (for Google sign-in)
+
+### 1. Install dependencies
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+### 2. Configure environment
+
+Create a `.env` file in the project root:
+
+```env
+# Server
+PORT=4000
+FRONTEND_URL=http://localhost:3000
+
+# Database
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=motolog
+DB_PORT=5432
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/motolog
+
+# JWT
+JWT_SECRET=your-secret
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=7d
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CALLBACK_URL=http://localhost:4000/auth/google/callback
+
+# AWS S3
+S3_BUCKET_NAME=
+S3_REGION=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+
+# External APIs
+VIN_API_BASE_URL=https://vpic.nhtsa.dot.gov/api/vehicles
+
+# HTTP client (optional)
+HTTP_TIMEOUT=5000
+HTTP_MAX_REDIRECTS=5
+```
+
+The frontend runs on port 3000, so the API needs a different port.
+
+### 3. Start the database
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4. Apply migrations and seed data
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npx prisma migrate dev
+npx prisma db seed
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The seed creates the system service categories, a local admin account
+(`admin@admin.com` / `Admin1234`, for local development only), and imports
+vehicle makes from the NHTSA API.
 
-## Resources
+### 5. Run the app
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+npm run start:dev
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## API Overview
 
-## Support
+| Module | Base route | Main endpoints |
+|---|---|---|
+| Auth | `/auth` | `POST sign-up`, `POST sign-in`, `POST refresh`, `GET me`, `GET google` |
+| Users | `/users` | create, list, update, update avatar, update password |
+| Vehicles | `/vehicles` | create, `GET my`, `POST decode-vin`, update mileage and image, link/unlink owner, `GET shared/:id`, admin verify |
+| Service logs | `/service-logs` | create, `PATCH :id/correct`, list by vehicle, delete |
+| Categories | `/categories` | list, create, update, delete |
+| Makes / Models | `/vehicles-makes`, `/vehicles-models` | list, create, delete |
+| Analytics | `/analytics` | `GET vehicles/:id/mileage`, `GET vehicles/:id/summary`, `GET admin/stats` |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Scripts
 
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Command | Description |
+|---|---|
+| `npm run start:dev` | Start in watch mode |
+| `npm run build` | Build for production |
+| `npm run start:prod` | Run the production build |
+| `npm run lint` | Lint and fix |
+| `npm run format` | Format with Prettier |
